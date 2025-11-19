@@ -1,0 +1,110 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Modelo de Usuario
+model User {
+  id               String    @id @default(uuid())
+  email            String    @unique
+  password         String    // Hash de la contraseña
+  firstName        String?
+  lastName         String?
+  phone            String?
+  role             UserRole  @default(USER)
+  resetToken       String?   // Token para reset de contraseña
+  resetTokenExpiry DateTime? // Expiración del token
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relaciones
+  addresses Address[]
+  orders    Order[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+// Modelo de Dirección
+model Address {
+  id          String   @id @default(uuid())
+  userId      String
+  street      String
+  city        String
+  province    String   // Provincia en Costa Rica
+  postalCode  String?
+  country     String   @default("Costa Rica")
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relaciones
+  user  User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@map("addresses")
+}
+
+// Modelo de Orden/Pedido
+model Order {
+  id              String      @id @default(uuid())
+  userId          String
+  addressId       String?
+  externalLink    String      // Link de Amazon/eBay/etc
+  itemName        String?     // Nombre del artículo (opcional, se puede extraer después)
+  itemPrice       Decimal     @default(0) // Precio del artículo en USD
+  shippingCost    Decimal     @default(0) // Costo de envío
+  taxes           Decimal     @default(0) // Impuestos
+  serviceFee      Decimal     @default(0) // Tarifa de servicio
+  totalPrice      Decimal     // Precio total
+  status          OrderStatus @default(REQUESTED)
+  notes           String?     // Notas adicionales
+  trackingNumber  String?     // Número de tracking
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relaciones
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  address         Address?            @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  statusHistory   OrderStatusHistory[]
+
+  @@map("orders")
+}
+
+enum OrderStatus {
+  REQUESTED        // Solicitado
+  QUOTED           // Cotizado
+  PAYMENT_PENDING  // Pago pendiente
+  PAID             // Pagado
+  IN_TRANSIT       // En tránsito
+  IN_CUSTOMS       // En aduana
+  READY_FOR_PICKUP // Listo para entrega
+  DELIVERED        // Entregado
+  CANCELLED        // Cancelado
+}
+
+// Historial de estados de una orden
+model OrderStatusHistory {
+  id        String      @id @default(uuid())
+  orderId   String
+  status    OrderStatus
+  notes     String?     // Notas sobre el cambio de estado
+  createdAt DateTime    @default(now())
+
+  // Relaciones
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_status_history")
+}
+
