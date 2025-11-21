@@ -13,6 +13,7 @@ import { ChatService } from './chat.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
+import { UpdateTtlDto } from './dto/update-ttl.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -131,6 +132,21 @@ export class ChatController {
   @Roles('ADMIN')
   async updateSupportSchedule(@Body() updateScheduleDto: UpdateScheduleDto) {
     return this.chatService.updateSupportSchedule(updateScheduleDto);
+  }
+
+  // Configuración de TTL del chat
+  @Get('admin/ttl')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async getChatTTL() {
+    return this.chatService.getChatTTL();
+  }
+
+  @Patch('admin/ttl')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  async updateChatTTL(@Body() updateTtlDto: UpdateTtlDto) {
+    return this.chatService.updateChatTTL(updateTtlDto.ttlMinutes);
   }
 }
 

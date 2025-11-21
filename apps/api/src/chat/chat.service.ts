@@ -3,11 +3,92 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
-import { ChatStatus } from '@prisma/client';
+import { ChatStatus, ChatConversation } from '@prisma/client';
+
+// TTL por defecto en minutos (se usará si no hay configuración en BD)
+const DEFAULT_CHAT_TTL_MINUTES = 5;
 
 @Injectable()
 export class ChatService {
   constructor(private prisma: PrismaService) {}
+
+  /**
+   * Obtiene el TTL del chat en milisegundos desde la configuración de la BD.
+   * Si no existe configuración, usa el valor por defecto.
+   */
+  private async getChatTTLMs(): Promise<number> {
+    try {
+      const settings = await this.prisma.chatSettings.findUnique({
+        where: { key: 'chat_ttl_minutes' },
+      });
+      
+      if (settings) {
+        const ttlMinutes = parseInt(settings.value, 10);
+        // Validar que esté en rango razonable (1-60 minutos)
+        if (ttlMinutes >= 1 && ttlMinutes <= 60) {
+          return ttlMinutes * 60 * 1000; // Convertir minutos a milisegundos
+        }
+      }
+    } catch (error) {
+      console.error('Error obteniendo TTL del chat:', error);
+    }
+    
+    // Si no hay configuración o hay error, usar valor por defecto
+    return DEFAULT_CHAT_TTL_MINUTES * 60 * 1000;
+  }
+
+  /**
+   * Función central para manejar la expiración de conversaciones.
+   * Esta es la ÚNICA función que decide si una conversación ha expirado y la cierra.
+   */
+  private async handleExpiration<T extends ChatConversation & { user?: any; admin?: any; messages?: any[] }>(
+    conversation: T
+  ): Promise<T> {
+    // Si ya está cerrada, devolver tal cual
+    if (conversation.status === ChatStatus.CLOSED) {
+      return conversation;
+    }
+
+    const now = new Date();
+
+    // Si expiresAt es nulo, calcularlo basado en lastActivityAt o createdAt
+    if (!conversation.expiresAt) {
+      const base = conversation.lastActivityAt || conversation.createdAt || now;
+      const chatTTLMs = await this.getChatTTLMs();
+      const expiresAt = new Date(base.getTime() + chatTTLMs);
+      
+      // Actualizar expiresAt en la base de datos
+      await this.prisma.chatConversation.update({
+        where: { id: conversation.id },
+        data: { expiresAt },
+      });
+      
+      conversation.expiresAt = expiresAt;
+    }
+
+    // Verificar si ha expirado
+    if (conversation.expiresAt && new Date(conversation.expiresAt) <= now) {
+      // Cerrar la conversación en la base de datos
+      // Nota: closedAt se agregará automáticamente después de ejecutar la migración de Prisma
+      await this.prisma.chatConversation.update({
+        where: { id: conversation.id },
+        data: {
+          status: ChatStatus.CLOSED,
+        },
+      });
+
+      // Actualizar el estado local manteniendo los includes originales
+      // Nota: closedAt se agregará al tipo después de ejecutar la migración
+      return {
+        ...conversation,
+        status: ChatStatus.CLOSED,
+        closedAt: now,
+      } as T;
+    }
+
+    // Si no ha expirado, devolver tal cual
+    return conversation;
+  }
 
   async createConversation(userId: string | null, createConversationDto: CreateConversationDto) {
     // Si el usuario está autenticado, usar sus datos
@@ -33,9 +114,10 @@ export class ChatService {
       userData.guestPhone = createConversationDto.guestPhone;
     }
 
-    // Calcular fecha de expiración (5 minutos después de la creación)
+    // Calcular fecha de expiración usando TTL configurable
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutos
+    const chatTTLMs = await this.getChatTTLMs();
+    const expiresAt = new Date(now.getTime() + chatTTLMs);
 
     // Crear conversación
     const conversation = await this.prisma.chatConversation.create({
@@ -76,22 +158,28 @@ export class ChatService {
 
       // Actualizar lastMessageAt y lastActivityAt
       const now = new Date();
+      const chatTTLMs = await this.getChatTTLMs();
       await this.prisma.chatConversation.update({
         where: { id: conversation.id },
         data: { 
           lastMessageAt: now,
           lastActivityAt: now,
-          // Extender expiración si la conversación estaba por expirar
-          expiresAt: new Date(now.getTime() + 5 * 60 * 1000), // 5 minutos más
+          // Extender expiración usando TTL configurable
+          expiresAt: new Date(now.getTime() + chatTTLMs),
         },
       });
     }
 
-    return this.getConversation(conversation.id, userId);
+    // Obtener la conversación completa con todos los includes
+    const fullConversation = await this.getConversation(conversation.id, userId);
+    
+    // handleExpiration ya se llama dentro de getConversation, pero lo llamamos explícitamente aquí también
+    // para asegurar que el estado esté actualizado antes de devolver
+    return await this.handleExpiration(fullConversation);
   }
 
   async getConversation(conversationId: string, userId: string | null, showRecentOnly: boolean = false) {
-    const conversation = await this.prisma.chatConversation.findUnique({
+    let conversation = await this.prisma.chatConversation.findUnique({
       where: { id: conversationId },
       include: {
         user: {
@@ -150,16 +238,8 @@ export class ChatService {
       }
     }
 
-    // Verificar si la conversación expiró
-    const now = new Date();
-    if (conversation.expiresAt && conversation.expiresAt < now) {
-      // Cerrar conversación expirada
-      await this.prisma.chatConversation.update({
-        where: { id: conversationId },
-        data: { status: ChatStatus.CLOSED },
-      });
-      conversation.status = ChatStatus.CLOSED;
-    }
+    // Usar la función central para manejar la expiración
+    conversation = await this.handleExpiration(conversation);
 
     // Si showRecentOnly es true y no es admin, mostrar solo mensajes de los últimos 10 minutos
     if (showRecentOnly && userId) {
@@ -170,6 +250,7 @@ export class ChatService {
       const isAdmin = user?.role === 'ADMIN';
       
       if (!isAdmin) {
+        const now = new Date();
         const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
         conversation.messages = conversation.messages.filter(
           msg => new Date(msg.createdAt) >= tenMinutesAgo
@@ -202,19 +283,12 @@ export class ChatService {
         orderBy: { lastMessageAt: 'desc' },
       });
 
-      // Verificar y cerrar conversaciones expiradas
-      const now = new Date();
-      for (const conversation of conversations) {
-        if (conversation.expiresAt && new Date(conversation.expiresAt) < now && conversation.status !== ChatStatus.CLOSED) {
-          await this.prisma.chatConversation.update({
-            where: { id: conversation.id },
-            data: { status: ChatStatus.CLOSED },
-          });
-          conversation.status = ChatStatus.CLOSED;
-        }
-      }
+      // Usar la función central para manejar la expiración de todas las conversaciones
+      const processedConversations = await Promise.all(
+        conversations.map(conv => this.handleExpiration(conv))
+      );
 
-      return conversations;
+      return processedConversations;
     } else {
       // Usuario no autenticado no puede listar conversaciones sin email
       return [];
@@ -238,7 +312,7 @@ export class ChatService {
       ];
     }
 
-    return this.prisma.chatConversation.findMany({
+    const conversations = await this.prisma.chatConversation.findMany({
       where,
       include: {
         user: {
@@ -264,10 +338,17 @@ export class ChatService {
       },
       orderBy: { lastMessageAt: 'desc' },
     });
+
+    // Usar la función central para manejar la expiración de todas las conversaciones
+    const processedConversations = await Promise.all(
+      conversations.map(conv => this.handleExpiration(conv))
+    );
+
+    return processedConversations;
   }
 
   async sendMessage(conversationId: string, senderId: string | null, sendMessageDto: SendMessageDto, isAdmin: boolean = false) {
-    const conversation = await this.prisma.chatConversation.findUnique({
+    let conversation = await this.prisma.chatConversation.findUnique({
       where: { id: conversationId },
     });
 
@@ -275,23 +356,15 @@ export class ChatService {
       throw new NotFoundException('Conversación no encontrada');
     }
 
-    // Verificar si la conversación está cerrada
+    // Usar la función central para manejar la expiración
+    conversation = await this.handleExpiration(conversation);
+
+    // Verificar si la conversación está cerrada o expirada
     if (conversation.status === ChatStatus.CLOSED) {
-      throw new BadRequestException('No puedes enviar mensajes a una conversación cerrada. Por favor, inicia una nueva conversación.');
+      throw new BadRequestException('Esta conversación ha expirado o está cerrada. Por favor, inicia una nueva conversación.');
     }
 
-    // Verificar si la conversación expiró
     const now = new Date();
-    if (conversation.expiresAt && new Date(conversation.expiresAt) < now) {
-      // Cerrar automáticamente si expiró
-      await this.prisma.chatConversation.update({
-        where: { id: conversationId },
-        data: { status: ChatStatus.CLOSED },
-      });
-      throw new BadRequestException('Esta conversación ha expirado por inactividad. Por favor, inicia una nueva conversación.');
-    }
-
-    // Reutilizar la variable 'now' más adelante
 
     // Verificar permisos
     if (senderId) {
@@ -334,15 +407,15 @@ export class ChatService {
       },
     });
 
-    // Actualizar lastMessageAt, lastActivityAt y extender expiración
-    // Reutilizar la variable 'now' declarada anteriormente
+    // Actualizar lastMessageAt, lastActivityAt y extender expiración usando TTL configurable
+    const chatTTLMs = await this.getChatTTLMs();
     await this.prisma.chatConversation.update({
       where: { id: conversationId },
       data: { 
         lastMessageAt: now,
         lastActivityAt: now,
-        // Extender expiración a 5 minutos desde ahora
-        expiresAt: new Date(now.getTime() + 5 * 60 * 1000),
+        // Extender expiración usando TTL configurable
+        expiresAt: new Date(now.getTime() + chatTTLMs),
         // Mantener el status actual (ya verificamos que no está cerrada)
         status: conversation.status,
       },
@@ -421,9 +494,13 @@ export class ChatService {
       }
     }
 
+    const now = new Date();
     return this.prisma.chatConversation.update({
       where: { id: conversationId },
-      data: { status: ChatStatus.CLOSED },
+      data: { 
+        status: ChatStatus.CLOSED,
+        // Nota: closedAt se agregará automáticamente después de ejecutar la migración de Prisma
+      },
       include: {
         user: {
           select: {
@@ -512,6 +589,51 @@ export class ChatService {
       available: false,
       message: `El soporte está disponible de ${todaySchedule.startTime} a ${todaySchedule.endTime}.`,
     };
+  }
+
+  // Gestión de configuración de TTL
+  async getChatTTL(): Promise<{ ttlMinutes: number }> {
+    try {
+      const settings = await this.prisma.chatSettings.findUnique({
+        where: { key: 'chat_ttl_minutes' },
+      });
+      
+      if (settings) {
+        const ttlMinutes = parseInt(settings.value, 10);
+        if (ttlMinutes >= 1 && ttlMinutes <= 60) {
+          return { ttlMinutes };
+        }
+      }
+    } catch (error) {
+      console.error('Error obteniendo TTL del chat:', error);
+    }
+    
+    // Si no hay configuración, devolver el valor por defecto
+    return { ttlMinutes: DEFAULT_CHAT_TTL_MINUTES };
+  }
+
+  async updateChatTTL(ttlMinutes: number): Promise<{ ttlMinutes: number }> {
+    // Validar rango
+    if (ttlMinutes < 1 || ttlMinutes > 60) {
+      throw new BadRequestException('El TTL debe estar entre 1 y 60 minutos');
+    }
+
+    // Actualizar o crear la configuración
+    await this.prisma.chatSettings.upsert({
+      where: { key: 'chat_ttl_minutes' },
+      update: {
+        value: ttlMinutes.toString(),
+        description: 'Tiempo de expiración del chat en minutos (TTL)',
+        updatedAt: new Date(),
+      },
+      create: {
+        key: 'chat_ttl_minutes',
+        value: ttlMinutes.toString(),
+        description: 'Tiempo de expiración del chat en minutos (TTL)',
+      },
+    });
+
+    return { ttlMinutes };
   }
 }
 

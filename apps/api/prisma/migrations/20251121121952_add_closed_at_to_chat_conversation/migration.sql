@@ -1,0 +1,1 @@
+ALTER TABLE "chat_conversations" ADD COLUMN IF NOT EXISTS "closedAt" TIMESTAMP(3);
