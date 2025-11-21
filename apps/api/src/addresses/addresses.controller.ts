@@ -30,22 +30,26 @@ export class AddressesController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @CurrentUser() user: any) {
+  findOne(@CurrentUser() user: any, @Param('id') id: string) {
     return this.addressesService.findOne(id, user.id);
   }
 
   @Patch(':id')
   update(
-    @Param('id') id: string,
     @CurrentUser() user: any,
+    @Param('id') id: string,
     @Body() updateAddressDto: UpdateAddressDto,
   ) {
     return this.addressesService.update(id, user.id, updateAddressDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @CurrentUser() user: any) {
+  remove(@CurrentUser() user: any, @Param('id') id: string) {
     return this.addressesService.remove(id, user.id);
   }
-}
 
+  @Post(':id/set-default')
+  setDefault(@CurrentUser() user: any, @Param('id') id: string) {
+    return this.addressesService.setDefault(id, user.id);
+  }
+}

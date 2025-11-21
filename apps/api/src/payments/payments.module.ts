@@ -1,6 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
-import { OrdersService } from './orders.service';
-import { OrdersController } from './orders.controller';
+import { PaymentsService } from './payments.service';
+import { PaymentsController } from './payments.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuditModule } from '../audit/audit.module';
@@ -11,9 +11,8 @@ import { AuditModule } from '../audit/audit.module';
     forwardRef(() => NotificationsModule),
     AuditModule,
   ],
-  controllers: [OrdersController],
-  providers: [OrdersService],
-  exports: [OrdersService],
+  controllers: [PaymentsController],
+  providers: [PaymentsService],
+  exports: [PaymentsService],
 })
-export class OrdersModule {}
-
+export class PaymentsModule {}

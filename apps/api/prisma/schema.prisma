@@ -25,8 +25,15 @@ model User {
   updatedAt        DateTime  @updatedAt
 
   // Relaciones
-  addresses Address[]
-  orders    Order[]
+  addresses        Address[]
+  orders           Order[]
+  statusChanges    OrderStatusHistory[] @relation("OrderStatusChanges")
+  wishlistItems    WishlistItem[]
+  supportTickets   SupportTicket[]
+  adminActions     AdminActionLog[]
+  chatConversationsAsUser ChatConversation[] @relation("ChatUser")
+  chatConversationsAsAdmin ChatConversation[] @relation("ChatAdmin")
+  chatMessages     ChatMessage[]
 
   @@map("users")
 }
@@ -40,12 +47,15 @@ enum UserRole {
 model Address {
   id          String   @id @default(uuid())
   userId      String
-  street      String
-  city        String
+  alias       String   // Nombre/alias del domicilio (ej: "Casa", "Trabajo")
+  street      String   // Dirección exacta
+  references  String?  // Referencias adicionales
   province    String   // Provincia en Costa Rica
+  canton      String   // Cantón
+  district    String   // Distrito
   postalCode  String?
   country     String   @default("Costa Rica")
-  isDefault   Boolean  @default(false)
+  isDefault   Boolean  @default(false) // Domicilio principal
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -56,42 +66,89 @@ model Address {
   @@map("addresses")
 }
 
-// Modelo de Orden/Pedido
-model Order {
-  id              String      @id @default(uuid())
-  userId          String
-  addressId       String?
-  externalLink    String      // Link de Amazon/eBay/etc
-  itemName        String?     // Nombre del artículo (opcional, se puede extraer después)
-  itemPrice       Decimal     @default(0) // Precio del artículo en USD
-  shippingCost    Decimal     @default(0) // Costo de envío
-  taxes           Decimal     @default(0) // Impuestos
-  serviceFee      Decimal     @default(0) // Tarifa de servicio
-  totalPrice      Decimal     // Precio total
-  status          OrderStatus @default(REQUESTED)
-  notes           String?     // Notas adicionales
-  trackingNumber  String?     // Número de tracking
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+// Modelo de Casillero Internacional
+model Locker {
+  id              String   @id @default(uuid())
+  name            String   // Nombre del casillero (ej: "Miami – USA")
+  country         String   // País del casillero
+  city            String   // Ciudad
+  address         String   // Dirección completa
+  lockerCode      String   // Código/formato del casillero
+  instructions    String   // Instrucciones de uso (qué poner en Name, Address line 1, etc.)
+  isActive        Boolean  @default(true) // Activo/desactivado
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   // Relaciones
-  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  address         Address?            @relation(fields: [addressId], references: [id], onDelete: SetNull)
-  statusHistory   OrderStatusHistory[]
+  orders          Order[]
+
+  @@map("lockers")
+}
+
+// Modelo de Orden/Pedido
+model Order {
+  id                  String      @id @default(uuid())
+  userId              String
+  addressId           String?     // Domicilio de entrega
+  lockerId            String?     // Casillero usado para este pedido
+  externalLink        String      // Link de Amazon/eBay/etc
+  itemName            String?     // Nombre del artículo (opcional, se puede extraer después)
+  quantity            Int         @default(1) // Cantidad
+  itemPrice           Decimal     @default(0) // Precio del artículo en USD
+  shippingCost        Decimal     @default(0) // Costo de envío
+  taxes               Decimal     @default(0) // Impuestos
+  serviceFee          Decimal     @default(0) // Tarifa de servicio
+  totalPrice          Decimal     // Precio total
+  status              OrderStatus @default(CREATED)
+  notes               String?     // Notas adicionales del usuario
+  trackingNumber      String?     // Número de tracking
+  // Campos de cotización
+  quotationExpiresAt  DateTime?   // Validez de la cotización
+  quotedAt            DateTime?   // Cuándo se generó la cotización
+  acceptedAt          DateTime?   // Cuándo el usuario aceptó
+  // Campos de pago
+  paymentStatus       PaymentStatus? // Estado del pago
+  paymentMethod       PaymentMethod? // Método de pago usado
+  // Campos de facturación
+  invoiceNumber      String?     // Número de factura
+  invoicedAt         DateTime?   // Fecha de facturación
+  // Tiempos estimados
+  estimatedDeliveryMinDays Int?   // Días mínimos estimados
+  estimatedDeliveryMaxDays Int?   // Días máximos estimados
+  // Campos de incidencias
+  hasIssue           Boolean     @default(false) // Marca si el pedido tiene problemas
+  issueDescription   String?     // Descripción de la incidencia
+  tags               String[]    @default([]) // Tags para organización (ej: ["URGENTE", "VIP"])
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  // Relaciones
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  address             Address?            @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  locker              Locker?             @relation(fields: [lockerId], references: [id], onDelete: SetNull)
+  statusHistory       OrderStatusHistory[]
+  payments            Payment[]
+  supportTickets      SupportTicket[]
 
   @@map("orders")
 }
 
 enum OrderStatus {
-  REQUESTED        // Solicitado
-  QUOTED           // Cotizado
-  PAYMENT_PENDING  // Pago pendiente
-  PAID             // Pagado
-  IN_TRANSIT       // En tránsito
-  IN_CUSTOMS       // En aduana
-  READY_FOR_PICKUP // Listo para entrega
-  DELIVERED        // Entregado
-  CANCELLED        // Cancelado
+  CREATED                    // Pedido creado por el usuario
+  REQUESTED                  // Solicitado (mantener compatibilidad)
+  QUOTED                     // Cotizado
+  PAYMENT_PENDING            // Pago pendiente
+  PAID                       // Pagado
+  PURCHASED_FROM_STORE       // Se compró en la tienda (Amazon/eBay/otra)
+  ARRIVED_AT_FOREIGN_LOCKER  // Llegó al casillero en el extranjero
+  IN_TRANSIT_TO_CR           // En tránsito hacia Costa Rica
+  ARRIVED_IN_CR              // Llegó a Costa Rica
+  IN_CUSTOMS                 // En aduanas/migración
+  RELEASED_FROM_CUSTOMS      // Liberado de aduanas
+  IN_NATIONAL_LOCKER         // En casillero nacional/almacén local
+  OUT_FOR_DELIVERY           // En ruta hacia la casa del cliente
+  DELIVERED                  // Entregado
+  CANCELLED                  // Cancelado
 }
 
 // Historial de estados de una orden
@@ -99,12 +156,195 @@ model OrderStatusHistory {
   id        String      @id @default(uuid())
   orderId   String
   status    OrderStatus
-  notes     String?     // Notas sobre el cambio de estado
+  notes     String?     // Notas/comentarios sobre el cambio de estado
+  changedBy String?     // ID del admin que hizo el cambio (opcional, puede ser null si es automático)
   createdAt DateTime    @default(now())
 
   // Relaciones
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  changedByUser User?   @relation("OrderStatusChanges", fields: [changedBy], references: [id], onDelete: SetNull)
 
   @@map("order_status_history")
+}
+
+// Modelo de Pago
+model Payment {
+  id              String        @id @default(uuid())
+  orderId         String
+  method          PaymentMethod
+  amount          Decimal       // Monto del pago
+  currency        String        @default("USD") // Moneda (USD, CRC)
+  status          PaymentStatus @default(PENDING)
+  // Campos específicos de SINPE
+  sinpeCode       String?       // Código que la app genera para que el usuario lo ponga en el detalle del SINPE
+  sinpeReference  String?       // Referencia que el usuario o admin registra desde el comprobante
+  // Campos para futuro pago con tarjeta
+  cardToken       String?       // Token de pasarela (nunca guardar tarjeta cruda)
+  cardLast4       String?       // Últimos 4 dígitos (solo lectura)
+  cardBrand       String?       // Visa, Mastercard, etc.
+  // Metadata adicional
+  metadata        Json?         // Datos adicionales en formato JSON
+  createdAt       DateTime      @default(now())
+  confirmedAt     DateTime?     // Cuándo se confirmó el pago
+  failedAt        DateTime?     // Cuándo falló el pago
+
+  // Relaciones
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+enum PaymentMethod {
+  SINPE
+  CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  REFUNDED
+}
+
+// Modelo de Wishlist
+model WishlistItem {
+  id              String    @id @default(uuid())
+  userId          String
+  externalLink    String    // Link del producto
+  title           String?   // Título/nombre del producto
+  notes           String?   // Notas del usuario
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relaciones
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("wishlist_items")
+}
+
+// Modelo de Ticket de Soporte
+model SupportTicket {
+  id          String            @id @default(uuid())
+  orderId     String
+  userId      String
+  status      TicketStatus      @default(OPEN)
+  category    TicketCategory
+  title       String
+  description String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  // Relaciones
+  order       Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    TicketMessage[]
+
+  @@map("support_tickets")
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum TicketCategory {
+  SHIPPING
+  BILLING
+  PRODUCT
+  OTHER
+}
+
+// Modelo de Mensajes de Ticket (opcional, para conversación)
+model TicketMessage {
+  id          String        @id @default(uuid())
+  ticketId    String
+  userId      String?       // Usuario que envió el mensaje (null si es admin automático)
+  isAdmin     Boolean       @default(false) // Si es mensaje de admin
+  message     String
+  createdAt   DateTime      @default(now())
+
+  // Relaciones
+  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@map("ticket_messages")
+}
+
+// Modelo de Log de Acciones de Admin (Auditoría)
+model AdminActionLog {
+  id            String    @id @default(uuid())
+  adminId       String
+  entityType    String    // "ORDER", "PAYMENT", "LOCKER", "TICKET", etc.
+  entityId      String    // ID de la entidad afectada
+  action        String    // "UPDATE_STATUS", "UPDATE_PRICES", "CONFIRM_PAYMENT", etc.
+  previousValue Json?     // Valor anterior (resumido)
+  newValue      Json?     // Valor nuevo (resumido)
+  notes         String?   // Notas adicionales
+  createdAt     DateTime  @default(now())
+
+  // Relaciones
+  admin         User      @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@map("admin_action_logs")
+}
+
+// Modelo de Conversación de Chat
+model ChatConversation {
+  id              String        @id @default(uuid())
+  userId          String?       // Usuario registrado (null si es invitado)
+  adminId         String?       // Admin asignado a la conversación
+  guestName       String?       // Nombre del invitado (si no está registrado)
+  guestEmail      String?       // Email del invitado (si no está registrado)
+  guestPhone      String?       // Teléfono del invitado (si no está registrado)
+  status          ChatStatus    @default(OPEN)
+  lastMessageAt   DateTime?     // Último mensaje enviado
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relaciones
+  user            User?         @relation("ChatUser", fields: [userId], references: [id], onDelete: Cascade)
+  admin           User?         @relation("ChatAdmin", fields: [adminId], references: [id], onDelete: SetNull)
+  messages        ChatMessage[]
+
+  @@map("chat_conversations")
+}
+
+enum ChatStatus {
+  OPEN
+  ASSIGNED
+  CLOSED
+}
+
+// Modelo de Mensaje de Chat
+model ChatMessage {
+  id              String        @id @default(uuid())
+  conversationId  String
+  senderId        String?       // ID del usuario/admin que envió (null si es sistema)
+  isFromAdmin     Boolean       @default(false)
+  isSystem        Boolean       @default(false) // Mensaje del sistema
+  content         String
+  readAt          DateTime?     // Cuándo fue leído
+  createdAt       DateTime      @default(now())
+
+  // Relaciones
+  conversation    ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender          User?         @relation(fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@map("chat_messages")
+}
+
+// Modelo de Configuración de Horario de Asistencia
+model ChatSupportSchedule {
+  id              String    @id @default(uuid())
+  dayOfWeek       Int       // 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
+  isActive        Boolean   @default(true)
+  startTime       String    // Formato HH:mm (ej: "09:00")
+  endTime         String    // Formato HH:mm (ej: "17:00")
+  timezone        String    @default("America/Costa_Rica")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([dayOfWeek])
+  @@map("chat_support_schedules")
 }
 

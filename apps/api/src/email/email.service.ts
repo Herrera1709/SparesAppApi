@@ -68,7 +68,7 @@ export class EmailService {
     }
   }
 
-  private async sendWithRetry(mailOpts: any): Promise<any> {
+  async sendWithRetry(mailOpts: any): Promise<any> {
     if (!this.resend) {
       this.logger.warn('Resend no configurado. Email no enviado.');
       return null;
