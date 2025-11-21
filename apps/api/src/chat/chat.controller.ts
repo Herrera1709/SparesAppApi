@@ -41,10 +41,12 @@ export class ChatController {
   @UseGuards(OptionalJwtAuthGuard)
   async getConversation(
     @Param('id') id: string,
+    @Query('recent') recent?: string,
     @CurrentUser() user?: any,
   ) {
     const userId = user?.id || null;
-    return this.chatService.getConversation(id, userId);
+    const showRecentOnly = recent === 'true';
+    return this.chatService.getConversation(id, userId, showRecentOnly);
   }
 
   // Endpoint para usuarios autenticados: listar sus conversaciones
@@ -65,6 +67,17 @@ export class ChatController {
     const userId = user?.id || null;
     const isAdmin = user?.role === 'ADMIN';
     return this.chatService.sendMessage(id, userId, sendMessageDto, isAdmin);
+  }
+
+  // Endpoint para que el cliente cierre su propia conversación
+  @Patch('conversations/:id/close')
+  @UseGuards(OptionalJwtAuthGuard)
+  async closeConversation(
+    @Param('id') id: string,
+    @CurrentUser() user?: any,
+  ) {
+    const userId = user?.id || null;
+    return this.chatService.closeConversation(id, userId);
   }
 
   // Endpoints de admin

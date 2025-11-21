@@ -33,11 +33,18 @@ export class ChatService {
       userData.guestPhone = createConversationDto.guestPhone;
     }
 
+    // Calcular fecha de expiración (5 minutos después de la creación)
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutos
+
     // Crear conversación
     const conversation = await this.prisma.chatConversation.create({
       data: {
         ...userData,
+        subject: createConversationDto.subject || null,
         status: ChatStatus.OPEN,
+        lastActivityAt: now,
+        expiresAt: expiresAt,
       },
       include: {
         user: {
@@ -67,17 +74,23 @@ export class ChatService {
         },
       });
 
-      // Actualizar lastMessageAt
+      // Actualizar lastMessageAt y lastActivityAt
+      const now = new Date();
       await this.prisma.chatConversation.update({
         where: { id: conversation.id },
-        data: { lastMessageAt: new Date() },
+        data: { 
+          lastMessageAt: now,
+          lastActivityAt: now,
+          // Extender expiración si la conversación estaba por expirar
+          expiresAt: new Date(now.getTime() + 5 * 60 * 1000), // 5 minutos más
+        },
       });
     }
 
     return this.getConversation(conversation.id, userId);
   }
 
-  async getConversation(conversationId: string, userId: string | null) {
+  async getConversation(conversationId: string, userId: string | null, showRecentOnly: boolean = false) {
     const conversation = await this.prisma.chatConversation.findUnique({
       where: { id: conversationId },
       include: {
@@ -137,13 +150,40 @@ export class ChatService {
       }
     }
 
+    // Verificar si la conversación expiró
+    const now = new Date();
+    if (conversation.expiresAt && conversation.expiresAt < now) {
+      // Cerrar conversación expirada
+      await this.prisma.chatConversation.update({
+        where: { id: conversationId },
+        data: { status: ChatStatus.CLOSED },
+      });
+      conversation.status = ChatStatus.CLOSED;
+    }
+
+    // Si showRecentOnly es true y no es admin, mostrar solo mensajes de los últimos 10 minutos
+    if (showRecentOnly && userId) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      });
+      const isAdmin = user?.role === 'ADMIN';
+      
+      if (!isAdmin) {
+        const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
+        conversation.messages = conversation.messages.filter(
+          msg => new Date(msg.createdAt) >= tenMinutesAgo
+        );
+      }
+    }
+
     return conversation;
   }
 
   async getUserConversations(userId: string | null) {
     if (userId) {
       // Usuario autenticado
-      return this.prisma.chatConversation.findMany({
+      const conversations = await this.prisma.chatConversation.findMany({
         where: { userId },
         include: {
           admin: {
@@ -161,6 +201,20 @@ export class ChatService {
         },
         orderBy: { lastMessageAt: 'desc' },
       });
+
+      // Verificar y cerrar conversaciones expiradas
+      const now = new Date();
+      for (const conversation of conversations) {
+        if (conversation.expiresAt && new Date(conversation.expiresAt) < now && conversation.status !== ChatStatus.CLOSED) {
+          await this.prisma.chatConversation.update({
+            where: { id: conversation.id },
+            data: { status: ChatStatus.CLOSED },
+          });
+          conversation.status = ChatStatus.CLOSED;
+        }
+      }
+
+      return conversations;
     } else {
       // Usuario no autenticado no puede listar conversaciones sin email
       return [];
@@ -221,6 +275,24 @@ export class ChatService {
       throw new NotFoundException('Conversación no encontrada');
     }
 
+    // Verificar si la conversación está cerrada
+    if (conversation.status === ChatStatus.CLOSED) {
+      throw new BadRequestException('No puedes enviar mensajes a una conversación cerrada. Por favor, inicia una nueva conversación.');
+    }
+
+    // Verificar si la conversación expiró
+    const now = new Date();
+    if (conversation.expiresAt && new Date(conversation.expiresAt) < now) {
+      // Cerrar automáticamente si expiró
+      await this.prisma.chatConversation.update({
+        where: { id: conversationId },
+        data: { status: ChatStatus.CLOSED },
+      });
+      throw new BadRequestException('Esta conversación ha expirado por inactividad. Por favor, inicia una nueva conversación.');
+    }
+
+    // Reutilizar la variable 'now' más adelante
+
     // Verificar permisos
     if (senderId) {
       const user = await this.prisma.user.findUnique({
@@ -262,10 +334,18 @@ export class ChatService {
       },
     });
 
-    // Actualizar lastMessageAt
+    // Actualizar lastMessageAt, lastActivityAt y extender expiración
+    // Reutilizar la variable 'now' declarada anteriormente
     await this.prisma.chatConversation.update({
       where: { id: conversationId },
-      data: { lastMessageAt: new Date() },
+      data: { 
+        lastMessageAt: now,
+        lastActivityAt: now,
+        // Extender expiración a 5 minutos desde ahora
+        expiresAt: new Date(now.getTime() + 5 * 60 * 1000),
+        // Mantener el status actual (ya verificamos que no está cerrada)
+        status: conversation.status,
+      },
     });
 
     return message;
@@ -311,6 +391,57 @@ export class ChatService {
     return this.prisma.chatConversation.update({
       where: { id: conversationId },
       data: { status },
+    });
+  }
+
+  async closeConversation(conversationId: string, userId: string | null) {
+    const conversation = await this.prisma.chatConversation.findUnique({
+      where: { id: conversationId },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException('Conversación no encontrada');
+    }
+
+    // Verificar permisos: solo el dueño de la conversación o un admin puede cerrarla
+    if (userId) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      });
+      const isAdmin = user?.role === 'ADMIN';
+      
+      if (!isAdmin && conversation.userId !== userId) {
+        throw new ForbiddenException('No tienes permiso para cerrar esta conversación');
+      }
+    } else {
+      // Usuario no autenticado solo puede cerrar conversaciones sin userId
+      if (conversation.userId) {
+        throw new ForbiddenException('No tienes permiso para cerrar esta conversación');
+      }
+    }
+
+    return this.prisma.chatConversation.update({
+      where: { id: conversationId },
+      data: { status: ChatStatus.CLOSED },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        admin: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
     });
   }
 

@@ -296,8 +296,11 @@ model ChatConversation {
   guestName       String?       // Nombre del invitado (si no está registrado)
   guestEmail      String?       // Email del invitado (si no está registrado)
   guestPhone      String?       // Teléfono del invitado (si no está registrado)
+  subject         String?       // Tema/asunto de la conversación
   status          ChatStatus    @default(OPEN)
   lastMessageAt   DateTime?     // Último mensaje enviado
+  lastActivityAt  DateTime?     // Última actividad (para expiración)
+  expiresAt       DateTime?     // Fecha de expiración (5 min después de inactividad)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 

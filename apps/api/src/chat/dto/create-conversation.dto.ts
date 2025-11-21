@@ -16,6 +16,11 @@ export class CreateConversationDto {
   guestPhone?: string;
 
   @IsString()
+  @IsOptional()
+  @MaxLength(200)
+  subject?: string;
+
+  @IsString()
   @MaxLength(1000)
   initialMessage: string;
 }
