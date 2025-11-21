@@ -13,6 +13,7 @@ import { PricingModule } from './pricing/pricing.module';
 import { AuditModule } from './audit/audit.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ChatModule } from './chat/chat.module';
+import { ProductExtractorModule } from './product-extractor/product-extractor.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { ChatModule } from './chat/chat.module';
     AuditModule,
     NotificationsModule,
     ChatModule,
+    ProductExtractorModule,
   ],
 })
 export class AppModule {}

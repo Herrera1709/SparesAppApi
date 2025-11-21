@@ -4,12 +4,14 @@ import { OrdersController } from './orders.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuditModule } from '../audit/audit.module';
+import { ProductExtractorModule } from '../product-extractor/product-extractor.module';
 
 @Module({
   imports: [
     PrismaModule,
     forwardRef(() => NotificationsModule),
     AuditModule,
+    ProductExtractorModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

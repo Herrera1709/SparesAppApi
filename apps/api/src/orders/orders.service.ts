@@ -5,6 +5,7 @@ import { UpdateOrderDto } from './dto/update-order.dto';
 import { OrderStatus, Prisma } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AuditService } from '../audit/audit.service';
+import { ProductExtractorService } from '../product-extractor/product-extractor.service';
 
 @Injectable()
 export class OrdersService {
@@ -13,9 +14,30 @@ export class OrdersService {
     @Inject(forwardRef(() => NotificationsService))
     private notificationsService: NotificationsService,
     private auditService: AuditService,
+    private productExtractorService: ProductExtractorService,
   ) {}
 
   async create(userId: string, createOrderDto: CreateOrderDto) {
+    // Intentar extraer información del producto automáticamente
+    let extractedProductInfo = null;
+    let itemName = createOrderDto.itemName;
+    
+    try {
+      extractedProductInfo = await this.productExtractorService.extractProductInfo(createOrderDto.externalLink);
+      
+      // Usar el título extraído si no se proporcionó uno
+      if (!itemName && extractedProductInfo.title) {
+        itemName = extractedProductInfo.title;
+      }
+      
+      // Si se extrajo precio, usarlo como referencia inicial
+      // (aunque el admin lo confirmará después)
+    } catch (error) {
+      // Si falla la extracción, continuar sin la información extraída
+      // No es crítico, el admin puede completar la información después
+      console.warn('No se pudo extraer información del producto automáticamente:', error.message);
+    }
+
     // Obtener el casillero activo por defecto si no se especifica
     let lockerId = createOrderDto.lockerId;
     if (!lockerId) {
@@ -27,7 +49,12 @@ export class OrdersService {
     }
 
     // Calcular precios iniciales (esto se actualizará después por el admin)
-    const itemPrice = new Prisma.Decimal(0);
+    // Si se extrajo precio, usarlo como referencia
+    const initialPrice = extractedProductInfo?.price 
+      ? new Prisma.Decimal(extractedProductInfo.price)
+      : new Prisma.Decimal(0);
+    
+    const itemPrice = initialPrice;
     const shippingCost = new Prisma.Decimal(0);
     const taxes = new Prisma.Decimal(0);
     const serviceFee = new Prisma.Decimal(0);
@@ -36,7 +63,7 @@ export class OrdersService {
     const order = await this.prisma.order.create({
       data: {
         externalLink: createOrderDto.externalLink,
-        itemName: createOrderDto.itemName,
+        itemName: itemName || createOrderDto.itemName,
         quantity: createOrderDto.quantity || 1,
         notes: createOrderDto.notes,
         itemPrice,
