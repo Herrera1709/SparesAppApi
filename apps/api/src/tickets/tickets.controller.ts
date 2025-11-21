@@ -11,6 +11,7 @@ import {
 import { TicketsService } from './tickets.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
+import { CreateTicketMessageDto } from './dto/create-ticket-message.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -63,6 +64,16 @@ export class TicketsController {
     @Body() updateTicketDto: UpdateTicketDto,
   ) {
     return this.ticketsService.update(id, user.id, updateTicketDto, true);
+  }
+
+  @Post(':id/messages')
+  addMessage(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() createMessageDto: CreateTicketMessageDto,
+  ) {
+    const isAdmin = user.role === 'ADMIN';
+    return this.ticketsService.addMessage(id, user.id, createMessageDto.message, isAdmin);
   }
 }
 

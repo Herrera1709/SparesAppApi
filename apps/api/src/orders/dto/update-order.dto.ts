@@ -86,5 +86,13 @@ export class UpdateOrderDto {
 
   @IsOptional()
   tags?: string[];
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(50, { message: 'El número de factura no puede exceder 50 caracteres' })
+  invoiceNumber?: string;
+
+  @IsOptional()
+  invoicedAt?: Date;
 }
 

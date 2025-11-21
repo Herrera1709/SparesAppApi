@@ -198,5 +198,27 @@ export class TicketsService {
       },
     });
   }
+
+  async addMessage(ticketId: string, userId: string, message: string, isAdmin: boolean = false) {
+    // Verificar que el ticket existe y el usuario tiene permiso
+    const ticket = await this.findOne(ticketId, userId, isAdmin);
+
+    return this.prisma.ticketMessage.create({
+      data: {
+        ticketId,
+        userId: isAdmin ? null : userId, // Si es admin, userId puede ser null
+        isAdmin,
+        message,
+      },
+      include: {
+        ticket: {
+          select: {
+            id: true,
+            status: true,
+          },
+        },
+      },
+    });
+  }
 }
 
