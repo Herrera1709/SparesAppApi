@@ -15,6 +15,8 @@ import { AuditModule } from './audit/audit.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ChatModule } from './chat/chat.module';
 import { ProductExtractorModule } from './product-extractor/product-extractor.module';
+import { SecurityModule } from './common/security/security.module';
+import { GlobalExceptionFilter } from './common/security/error-handler.filter';
 
 @Module({
   imports: [
@@ -35,6 +37,12 @@ import { ProductExtractorModule } from './product-extractor/product-extractor.mo
     ChatModule,
     ProductExtractorModule,
     InventoryModule,
+  ],
+  providers: [
+    {
+      provide: APP_FILTER,
+      useClass: GlobalExceptionFilter,
+    },
   ],
   providers: [
     {
