@@ -214,6 +214,154 @@ export class EmailService {
     }
   }
 
+  async sendEmailVerificationEmail(
+    email: string,
+    verificationToken: string,
+    firstName?: string,
+    registrationData?: { ip?: string; userAgent?: string; timestamp?: Date }
+  ): Promise<void> {
+    const verificationUrl = `${this.configService.get<string>('FRONTEND_URL') || 'http://localhost:4200'}/verify-email?token=${verificationToken}`;
+    const name = firstName || 'Usuario';
+    const timestamp = registrationData?.timestamp || new Date();
+    const formattedDate = timestamp.toLocaleString('es-CR', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    const mailOpts = {
+      from: this.fromEmail,
+      to: email,
+      subject: 'Verifica tu correo electrónico - ImportaCR',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body {
+              font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+              background: #f9fafb;
+            }
+            .container {
+              background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 50%, #F97316 100%);
+              border-radius: 16px;
+              padding: 40px;
+              color: white;
+              text-align: center;
+              box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            }
+            .content {
+              background: white;
+              border-radius: 12px;
+              padding: 40px;
+              margin-top: 20px;
+              color: #333;
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            }
+            .button {
+              display: inline-block;
+              padding: 14px 28px;
+              background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+              color: white;
+              text-decoration: none;
+              border-radius: 10px;
+              font-weight: 600;
+              margin: 20px 0;
+              box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            }
+            .info-box {
+              background: #f0f9ff;
+              border-left: 4px solid #3B82F6;
+              padding: 16px;
+              margin: 20px 0;
+              border-radius: 8px;
+            }
+            .footer {
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 1px solid #e5e7eb;
+              font-size: 14px;
+              color: #6b7280;
+              text-align: center;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1 style="margin: 0; font-size: 36px; font-weight: 800;">🌍 ImportaCR</h1>
+            <p style="margin: 10px 0 0 0; font-size: 20px; opacity: 0.95;">¡Bienvenido a la familia!</p>
+          </div>
+          <div class="content">
+            <h2 style="color: #1f2937; margin-top: 0; font-size: 28px;">¡Hola ${name}! 👋</h2>
+            <p style="font-size: 16px; color: #4b5563;">
+              Gracias por registrarte en ImportaCR. Para completar tu registro y activar tu cuenta, 
+              necesitamos verificar tu dirección de correo electrónico.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${verificationUrl}" class="button">Verificar mi correo electrónico</a>
+            </div>
+
+            <div class="info-box">
+              <h3 style="margin-top: 0; color: #1f2937; font-size: 18px;">📋 Detalles de tu registro</h3>
+              <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                <span style="font-weight: 600; color: #6b7280;">Fecha y hora:</span>
+                <span style="color: #1f2937;">${formattedDate}</span>
+              </div>
+              ${registrationData?.ip ? `
+              <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                <span style="font-weight: 600; color: #6b7280;">Dirección IP:</span>
+                <span style="color: #1f2937;">${registrationData.ip}</span>
+              </div>
+              ` : ''}
+              ${registrationData?.userAgent ? `
+              <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+                <span style="font-weight: 600; color: #6b7280;">Dispositivo:</span>
+                <span style="color: #1f2937;">${this.parseUserAgent(registrationData.userAgent)}</span>
+              </div>
+              ` : ''}
+            </div>
+
+            <p style="font-size: 14px; color: #6b7280; margin-top: 30px;">
+              O copia y pega este enlace en tu navegador:<br>
+              <a href="${verificationUrl}" style="color: #3B82F6; word-break: break-all;">${verificationUrl}</a>
+            </p>
+
+            <p style="font-size: 14px; color: #6b7280; margin-top: 20px;">
+              <strong>Importante:</strong> Este enlace expirará en 24 horas. Si no creaste esta cuenta, puedes ignorar este correo.
+            </p>
+
+            <p style="color: #6b7280; font-size: 14px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+              Si tienes alguna pregunta, no dudes en contactarnos. ¡Estamos aquí para ayudarte en cada paso del camino!
+            </p>
+          </div>
+          <div class="footer">
+            <p>© ${new Date().getFullYear()} ImportaCR - Todos los derechos reservados</p>
+            <p>Este es un correo automático, por favor no respondas directamente.</p>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    try {
+      await this.sendWithRetry(mailOpts);
+      this.logger.log(`Email de verificación enviado a ${email}`);
+    } catch (error) {
+      this.logger.error(`Error enviando email de verificación a ${email}:`, error);
+      throw new Error('Error al enviar el correo de verificación');
+    }
+  }
+
   async sendWelcomeEmail(email: string, firstName?: string, registrationData?: { ip?: string; userAgent?: string; timestamp?: Date }): Promise<void> {
     const name = firstName || 'Usuario';
     const timestamp = registrationData?.timestamp || new Date();
