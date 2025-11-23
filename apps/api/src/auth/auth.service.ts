@@ -32,11 +32,19 @@ export class AuthService {
     // Hash de la contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Crear usuario
+    // Generar token de verificación de email
+    const emailVerificationToken = randomBytes(32).toString('hex');
+    const emailVerificationTokenExpiry = new Date();
+    emailVerificationTokenExpiry.setHours(emailVerificationTokenExpiry.getHours() + 24); // Expira en 24 horas
+
+    // Crear usuario (sin verificar email)
     const user = await this.prisma.user.create({
       data: {
         email,
         password: hashedPassword,
+        emailVerified: false,
+        emailVerificationToken,
+        emailVerificationTokenExpiry,
         ...rest,
       },
       select: {
@@ -46,34 +54,49 @@ export class AuthService {
         lastName: true,
         phone: true,
         role: true,
+        emailVerified: true,
         createdAt: true,
       },
     });
 
-    // Generar token
-    const token = this.jwtService.sign({ userId: user.id, email: user.email, role: user.role });
-
-    // Enviar email de bienvenida (no bloquea el registro si falla)
+    // Enviar email de confirmación (no bloquea el registro si falla)
     try {
-      console.log(`[Auth] Enviando email de bienvenida a ${user.email}`);
-      await this.emailService.sendWelcomeEmail(user.email, user.firstName || undefined, clientInfo);
-      console.log(`[Auth] Email de bienvenida enviado exitosamente a ${user.email}`);
+      console.log(`[Auth] Enviando email de confirmación a ${user.email}`);
+      await this.emailService.sendEmailVerificationEmail(
+        user.email,
+        emailVerificationToken,
+        user.firstName || undefined,
+        clientInfo
+      );
+      console.log(`[Auth] Email de confirmación enviado exitosamente a ${user.email}`);
     } catch (error) {
-      console.error(`[Auth] Error enviando email de bienvenida a ${user.email}:`, error);
+      console.error(`[Auth] Error enviando email de confirmación a ${user.email}:`, error);
     }
 
+    // NO devolvemos token de autenticación - el usuario debe verificar su email primero
     return {
       user,
-      token,
+      message: 'Registro exitoso. Por favor, verifica tu correo electrónico para activar tu cuenta.',
     };
   }
 
   async login(loginDto: LoginDto, clientInfo?: { ip?: string; userAgent?: string; timestamp?: Date }) {
     const { email, password } = loginDto;
 
-    // Buscar usuario
+    // Buscar usuario - INCLUYENDO emailVerified explícitamente
     const user = await this.prisma.user.findUnique({
       where: { email },
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        role: true,
+        emailVerified: true, // IMPORTANTE: Incluir este campo
+        createdAt: true,
+      },
     });
 
     if (!user) {
@@ -85,6 +108,12 @@ export class AuthService {
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Credenciales inválidas');
+    }
+
+    // Verificar que el email esté confirmado
+    // Si emailVerified es null o undefined (usuarios antiguos), tratarlo como no verificado
+    if (!user.emailVerified || user.emailVerified === null || user.emailVerified === undefined) {
+      throw new UnauthorizedException('Por favor, verifica tu correo electrónico antes de iniciar sesión. Revisa tu bandeja de entrada.');
     }
 
     // Generar token
@@ -206,6 +235,94 @@ export class AuthService {
     });
 
     return { message: 'Contraseña restablecida exitosamente' };
+  }
+
+  async verifyEmail(token: string) {
+    // Buscar usuario con el token de verificación válido
+    const user = await this.prisma.user.findFirst({
+      where: {
+        emailVerificationToken: token,
+        emailVerificationTokenExpiry: {
+          gt: new Date(), // Token no expirado
+        },
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Token de verificación inválido o expirado');
+    }
+
+    // Verificar email y limpiar token
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationTokenExpiry: null,
+      },
+    });
+
+    // Generar token de autenticación para que el usuario pueda iniciar sesión automáticamente
+    const authToken = this.jwtService.sign({ userId: user.id, email: user.email, role: user.role });
+
+    return {
+      message: 'Email verificado exitosamente',
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        role: user.role,
+        emailVerified: true,
+        createdAt: user.createdAt,
+      },
+      token: authToken,
+    };
+  }
+
+  async resendVerificationEmail(email: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    // Por seguridad, no revelamos si el email existe o no
+    if (!user) {
+      return { message: 'Si el email existe, recibirás un correo con instrucciones' };
+    }
+
+    // Si ya está verificado, no hacer nada
+    if (user.emailVerified) {
+      return { message: 'El email ya está verificado' };
+    }
+
+    // Generar nuevo token de verificación
+    const emailVerificationToken = randomBytes(32).toString('hex');
+    const emailVerificationTokenExpiry = new Date();
+    emailVerificationTokenExpiry.setHours(emailVerificationTokenExpiry.getHours() + 24); // Expira en 24 horas
+
+    // Actualizar token en la base de datos
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerificationToken,
+        emailVerificationTokenExpiry,
+      },
+    });
+
+    // Enviar email
+    try {
+      await this.emailService.sendEmailVerificationEmail(
+        user.email,
+        emailVerificationToken,
+        user.firstName || undefined,
+      );
+    } catch (error) {
+      console.error('Error enviando email de verificación:', error);
+      // No lanzamos error para no revelar información
+    }
+
+    return { message: 'Si el email existe, recibirás un correo con instrucciones' };
   }
 }
 
