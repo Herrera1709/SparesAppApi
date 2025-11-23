@@ -321,9 +321,21 @@ export class AuthService {
 
     // ============================================
     // SEGURIDAD: No revelar si el token existe o no (timing attack protection)
+    // La query de Prisma ya valida el token, pero agregamos delay para prevenir timing attacks
     // ============================================
     if (!user) {
       // Simular tiempo de procesamiento para prevenir timing attacks
+      // Esto hace que el tiempo de respuesta sea similar independientemente de si el token existe
+      await new Promise(resolve => setTimeout(resolve, 100));
+      throw new BadRequestException('Token de verificación inválido o expirado');
+    }
+
+    // ============================================
+    // SEGURIDAD: Validación adicional con timing-safe comparison
+    // Aunque Prisma ya validó el token, agregamos una capa adicional de protección
+    // ============================================
+    if (user.emailVerificationToken && !TimingAttackProtection.secureCompare(user.emailVerificationToken, token)) {
+      // Si por alguna razón el token no coincide (caso muy raro), también agregamos delay
       await new Promise(resolve => setTimeout(resolve, 100));
       throw new BadRequestException('Token de verificación inválido o expirado');
     }
@@ -394,7 +406,7 @@ export class AuthService {
         user.firstName || undefined,
       );
     } catch (error) {
-      console.error('Error enviando email de verificación:', error);
+      this.logger.error('Error enviando email de verificación:', error);
       // No lanzamos error para no revelar información
     }
 

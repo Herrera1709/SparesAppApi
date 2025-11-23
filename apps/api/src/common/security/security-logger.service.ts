@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 export enum SecurityEventType {
   BRUTE_FORCE_ATTEMPT = 'BRUTE_FORCE_ATTEMPT',
@@ -32,6 +32,7 @@ interface SecurityEvent {
 
 @Injectable()
 export class SecurityLoggerService {
+  private readonly logger = new Logger(SecurityLoggerService.name);
   private events: SecurityEvent[] = [];
   private readonly MAX_EVENTS = 1000; // Mantener últimos 1000 eventos en memoria
 
@@ -64,7 +65,7 @@ export class SecurityLoggerService {
     }
 
     // Log a consola con formato estructurado
-    console.warn(`[SECURITY] ${type}`, {
+    this.logger.warn(`[SECURITY] ${type}`, {
       ip: details.ip,
       timestamp: event.timestamp.toISOString(),
       ...details,

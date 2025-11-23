@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -9,6 +9,7 @@ import { InventoryMovementType, Prisma } from '@prisma/client';
 
 @Injectable()
 export class InventoryService {
+  private readonly logger = new Logger(InventoryService.name);
   constructor(private prisma: PrismaService) {}
 
   // ============================================
@@ -79,7 +80,7 @@ export class InventoryService {
     } catch (error: any) {
       // Si la tabla no existe, retornar array vacío en lugar de lanzar error
       if (error.code === 'P2021' || error.code === '42P01' || error.message?.includes('does not exist')) {
-        console.warn('Las tablas de inventario no existen. Ejecuta la migración: npx prisma migrate dev');
+        this.logger.warn('Las tablas de inventario no existen. Ejecuta la migración: npx prisma migrate dev');
         return [];
       }
       throw error;
@@ -276,7 +277,7 @@ export class InventoryService {
     } catch (error: any) {
       // Si la tabla no existe, retornar array vacío en lugar de lanzar error
       if (error.code === 'P2021' || error.code === '42P01' || error.message?.includes('does not exist')) {
-        console.warn('Las tablas de inventario no existen. Ejecuta la migración: npx prisma migrate dev');
+        this.logger.warn('Las tablas de inventario no existen. Ejecuta la migración: npx prisma migrate dev');
         return [];
       }
       throw error;
@@ -972,7 +973,7 @@ export class InventoryService {
           inventariosCreados.push(inventario);
         }
       } catch (error: any) {
-        console.error(`Error creando inventario para producto ${invData.productId}:`, error.message);
+        this.logger.error(`Error creando inventario para producto ${invData.productId}:`, error.message);
         // Continuar con el siguiente aunque falle uno
       }
     }

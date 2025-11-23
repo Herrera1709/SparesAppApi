@@ -1,9 +1,10 @@
-import { Injectable, ExecutionContext } from '@nestjs/common';
+import { Injectable, ExecutionContext, Logger } from '@nestjs/common';
 import { ThrottlerGuard, ThrottlerLimitDetail } from '@nestjs/throttler';
 import { Request } from 'express';
 
 @Injectable()
 export class CustomThrottlerGuard extends ThrottlerGuard {
+  private readonly logger = new Logger(CustomThrottlerGuard.name);
   protected async getTracker(req: Record<string, any>): Promise<string> {
     // Usar IP real del cliente (considerando proxies)
     const request = req as Request;
@@ -24,7 +25,7 @@ export class CustomThrottlerGuard extends ThrottlerGuard {
     const request = context.switchToHttp().getRequest<Request>();
     const ip = await this.getTracker(request);
     
-    console.warn(`[Security] Rate limit excedido para IP: ${ip} - Ruta: ${request.path}`);
+    this.logger.warn(`[Security] Rate limit excedido para IP: ${ip} - Ruta: ${request.path}`);
     await super.throwThrottlingException(context, throttlerLimitDetail);
   }
 }

@@ -10,6 +10,7 @@ import {
   Query,
   UseInterceptors,
   UsePipes,
+  BadRequestException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { OrdersService } from './orders.service';
@@ -145,6 +146,13 @@ export class OrdersController {
     @CurrentUser() user: any,
     @Body() body: { tags: string[] },
   ) {
+    // ============================================
+    // SEGURIDAD: Validar tamaño máximo de arrays
+    // ============================================
+    if (body.tags && body.tags.length > 10) {
+      throw new BadRequestException('Máximo 10 tags permitidos');
+    }
+
     const isAdmin = user.role === 'ADMIN';
     return this.ordersService.update(id, user.id, {
       tags: body.tags,

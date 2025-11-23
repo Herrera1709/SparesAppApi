@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
@@ -10,6 +10,7 @@ const DEFAULT_CHAT_TTL_MINUTES = 5;
 
 @Injectable()
 export class ChatService {
+  private readonly logger = new Logger(ChatService.name);
   constructor(private prisma: PrismaService) {}
 
   /**
@@ -30,7 +31,7 @@ export class ChatService {
         }
       }
     } catch (error) {
-      console.error('Error obteniendo TTL del chat:', error);
+      this.logger.error('Error obteniendo TTL del chat:', error);
     }
     
     // Si no hay configuración o hay error, usar valor por defecto
@@ -613,7 +614,7 @@ export class ChatService {
         }
       }
     } catch (error) {
-      console.error('Error obteniendo TTL del chat:', error);
+      this.logger.error('Error obteniendo TTL del chat:', error);
     }
     
     // Si no hay configuración, devolver el valor por defecto

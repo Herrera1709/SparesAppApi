@@ -1,11 +1,11 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, BadRequestException } from '@nestjs/common';
+import { ValidationPipe, BadRequestException, Logger } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import * as path from 'path';
 import { config } from 'dotenv';
-import * as helmet from 'helmet';
+import helmet from 'helmet';
 import { json, urlencoded } from 'express';
 import { GlobalExceptionFilter } from './common/security/error-handler.filter';
 
@@ -25,7 +25,7 @@ async function bootstrap() {
   // ============================================
   // SEGURIDAD: Helmet - Headers de Seguridad
   // ============================================
-  app.use(helmet.default({
+  app.use(helmet({
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
@@ -67,7 +67,10 @@ async function bootstrap() {
     origin: (origin, callback) => {
       // En producción, rechazar requests sin origin
       if (!origin && process.env.NODE_ENV === 'production') {
-        console.warn(`[Security] CORS bloqueado: request sin origin`);
+        // Logger se inicializa después, usar console solo en desarrollo
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`[Security] CORS bloqueado: request sin origin`);
+        }
         return callback(new Error('Origin requerido'));
       }
       
@@ -88,7 +91,10 @@ async function bootstrap() {
       if (isValidOrigin) {
         callback(null, true);
       } else {
-        console.warn(`[Security] CORS bloqueado para origen: ${origin}`);
+        // Logger se inicializa después, usar console solo en desarrollo
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`[Security] CORS bloqueado para origen: ${origin}`);
+        }
         callback(new Error('No permitido por CORS'));
       }
     },
@@ -156,8 +162,9 @@ async function bootstrap() {
   const port = configService.get<number>('PORT') || 3000;
   await app.listen(port);
 
-  console.log(`🚀 API running on: http://localhost:${port}`);
-  console.log(`🔒 Security: Helmet, Rate Limiting, CORS, Validation enabled`);
+  const logger = new Logger('Bootstrap');
+  logger.log(`🚀 API running on: http://localhost:${port}`);
+  logger.log(`🔒 Security: Helmet, Rate Limiting, CORS, Validation enabled`);
 }
 
 bootstrap();

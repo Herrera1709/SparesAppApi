@@ -191,7 +191,18 @@ export class OrdersService {
       throw new NotFoundException('Orden no encontrada');
     }
 
+    // ============================================
+    // SEGURIDAD: Validación de ownership mejorada
+    // Verificar explícitamente rol ADMIN además de userId
+    // ============================================
     if (!isAdmin && order.userId !== userId) {
+      throw new ForbiddenException('No tienes permiso para ver esta orden');
+    }
+    
+    // Verificación adicional: si es admin, permitir acceso
+    // Si no es admin, debe ser el dueño
+    const hasAccess = isAdmin || order.userId === userId;
+    if (!hasAccess) {
       throw new ForbiddenException('No tienes permiso para ver esta orden');
     }
 
@@ -207,7 +218,12 @@ export class OrdersService {
       throw new NotFoundException('Orden no encontrada');
     }
 
-    if (!isAdmin && order.userId !== userId) {
+    // ============================================
+    // SEGURIDAD: Validación de ownership mejorada
+    // Verificar explícitamente rol ADMIN además de userId
+    // ============================================
+    const hasAccess = isAdmin || order.userId === userId;
+    if (!hasAccess) {
       throw new ForbiddenException('No tienes permiso para actualizar esta orden');
     }
 
@@ -249,6 +265,13 @@ export class OrdersService {
       if (isAdmin && (order.status === OrderStatus.CREATED || order.status === OrderStatus.REQUESTED)) {
         shouldQuote = true;
       }
+    }
+
+    // ============================================
+    // SEGURIDAD: Validar tamaño máximo de arrays
+    // ============================================
+    if (updateOrderDto.tags && updateOrderDto.tags.length > 10) {
+      throw new BadRequestException('Máximo 10 tags permitidos');
     }
 
     // Si se está cotizando, actualizar campos de cotización
@@ -499,7 +522,7 @@ export class OrdersService {
       'UPDATE_STATUS',
       { status: order.status },
       { status, notes, trackingNumber },
-    ).catch(err => console.error('Error registrando auditoría:', err));
+    ).catch(err => this.logger.error('Error registrando auditoría:', err));
 
     // Actualizar el pedido
     await this.prisma.order.update({
@@ -559,7 +582,7 @@ export class OrdersService {
           );
         } catch (error) {
           // Log el error pero no fallar la actualización del estado
-          console.error('Error descontando inventario al entregar orden:', error);
+          this.logger.error('Error descontando inventario al entregar orden:', error);
           // Opcionalmente, podrías revertir el estado o notificar al admin
         }
       }

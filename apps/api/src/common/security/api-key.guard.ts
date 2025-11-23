@@ -1,4 +1,4 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
@@ -11,6 +11,7 @@ import { IS_PUBLIC_API_KEY } from './public-api.decorator';
  */
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
+  private readonly logger = new Logger(ApiKeyGuard.name);
   private readonly validApiKeys: string[];
   private readonly apiKeyHeader = 'X-API-Key';
   private readonly appIdHeader = 'X-App-Id';
@@ -28,7 +29,7 @@ export class ApiKeyGuard implements CanActivate {
       // Si no hay API keys configuradas, generar una por defecto (solo desarrollo)
       this.validApiKeys = process.env.NODE_ENV === 'production' ? [] : ['dev-api-key-default'];
       if (process.env.NODE_ENV === 'production') {
-        console.warn('[Security] ⚠️ API_KEYS no configurado en producción. El API estará inaccesible.');
+        this.logger.warn('[Security] ⚠️ API_KEYS no configurado en producción. El API estará inaccesible.');
       }
     }
   }
@@ -45,7 +46,7 @@ export class ApiKeyGuard implements CanActivate {
       // En desarrollo, loggear para debugging
       if (process.env.NODE_ENV !== 'production') {
         const request = context.switchToHttp().getRequest<Request>();
-        console.log(`[ApiKeyGuard] Endpoint público detectado: ${request.method} ${request.path}`);
+        this.logger.debug(`[ApiKeyGuard] Endpoint público detectado: ${request.method} ${request.path}`);
       }
       return true;
     }
