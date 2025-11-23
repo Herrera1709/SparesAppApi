@@ -17,8 +17,12 @@ export class WishlistService {
   }
 
   async findAll(userId: string) {
+    // ============================================
+    // SEGURIDAD: Límite de resultados para prevenir DoS
+    // ============================================
     return this.prisma.wishlistItem.findMany({
       where: { userId },
+      take: 100, // Máximo 100 items
       orderBy: { createdAt: 'desc' },
     });
   }

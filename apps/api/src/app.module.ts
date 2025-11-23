@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
 import { ConfigModule } from './config/config.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
@@ -14,12 +15,18 @@ import { AuditModule } from './audit/audit.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ChatModule } from './chat/chat.module';
 import { ProductExtractorModule } from './product-extractor/product-extractor.module';
+<<<<<<< Updated upstream
 import { InventoryModule } from './inventory/inventory.module';
+=======
+import { SecurityModule } from './common/security/security.module';
+import { GlobalExceptionFilter } from './common/security/error-handler.filter';
+>>>>>>> Stashed changes
 
 @Module({
   imports: [
     ConfigModule,
     PrismaModule,
+    SecurityModule,
     AuthModule,
     UsersModule,
     AddressesModule,
@@ -34,6 +41,12 @@ import { InventoryModule } from './inventory/inventory.module';
     ChatModule,
     ProductExtractorModule,
     InventoryModule,
+  ],
+  providers: [
+    {
+      provide: APP_FILTER,
+      useClass: GlobalExceptionFilter,
+    },
   ],
 })
 export class AppModule {}

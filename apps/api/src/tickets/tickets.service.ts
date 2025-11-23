@@ -51,8 +51,12 @@ export class TicketsService {
   async findAll(userId: string, isAdmin: boolean = false) {
     const where = isAdmin ? {} : { userId };
 
+    // ============================================
+    // SEGURIDAD: Límite de resultados para prevenir DoS
+    // ============================================
     return this.prisma.supportTicket.findMany({
       where,
+      take: 100, // Máximo 100 tickets
       include: {
         order: {
           select: {
@@ -84,6 +88,17 @@ export class TicketsService {
     orderId?: string;
     userId?: string;
   }) {
+    // ============================================
+    // SEGURIDAD: Validar IDs son UUIDs válidos
+    // ============================================
+    if (filters.userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.userId)) {
+      throw new BadRequestException('userId debe ser un UUID válido');
+    }
+
+    if (filters.orderId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.orderId)) {
+      throw new BadRequestException('orderId debe ser un UUID válido');
+    }
+
     const where: any = {};
 
     if (filters.status) {
@@ -98,8 +113,12 @@ export class TicketsService {
       where.userId = filters.userId;
     }
 
+    // ============================================
+    // SEGURIDAD: Límite de resultados para prevenir DoS
+    // ============================================
     return this.prisma.supportTicket.findMany({
       where,
+      take: 100, // Máximo 100 tickets
       include: {
         order: {
           select: {
@@ -119,6 +138,7 @@ export class TicketsService {
         },
         messages: {
           orderBy: { createdAt: 'asc' },
+          take: 10, // Máximo 10 mensajes
         },
       },
       orderBy: { createdAt: 'desc' },

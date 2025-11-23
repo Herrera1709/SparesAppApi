@@ -264,8 +264,12 @@ export class ChatService {
   async getUserConversations(userId: string | null) {
     if (userId) {
       // Usuario autenticado
+      // ============================================
+      // SEGURIDAD: Límite de resultados para prevenir DoS
+      // ============================================
       const conversations = await this.prisma.chatConversation.findMany({
         where: { userId },
+        take: 50, // Máximo 50 conversaciones
         include: {
           admin: {
             select: {
@@ -312,8 +316,12 @@ export class ChatService {
       ];
     }
 
+    // ============================================
+    // SEGURIDAD: Límite de resultados para prevenir DoS
+    // ============================================
     const conversations = await this.prisma.chatConversation.findMany({
       where,
+      take: 100, // Máximo 100 conversaciones
       include: {
         user: {
           select: {

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Inject, forwardRef, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSinpePaymentDto } from './dto/create-sinpe-payment.dto';
 import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
@@ -9,6 +9,7 @@ import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
   constructor(
     private prisma: PrismaService,
     @Inject(forwardRef(() => NotificationsService))
@@ -184,11 +185,11 @@ export class PaymentsService {
         confirmedAt: new Date(),
       },
       `Pago confirmado. Referencia: ${confirmPaymentDto.sinpeReference || 'N/A'}`,
-    ).catch(err => console.error('Error registrando auditoría:', err));
+    ).catch(err => this.logger.error('Error registrando auditoría:', err));
 
     // Notificar al usuario
     this.notificationsService.notifyPaymentConfirmed(payment.orderId).catch(err => {
-      console.error('Error enviando notificación de pago confirmado:', err);
+      this.logger.error('Error enviando notificación de pago confirmado:', err);
     });
 
     return updatedPayment;

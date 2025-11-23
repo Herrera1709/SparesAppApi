@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, BadRequestException, Inject, forwardRef, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
@@ -10,6 +10,7 @@ import { InventoryService } from '../inventory/inventory.service';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
   constructor(
     private prisma: PrismaService,
     @Inject(forwardRef(() => NotificationsService))
@@ -37,7 +38,7 @@ export class OrdersService {
     } catch (error) {
       // Si falla la extracción, continuar sin la información extraída
       // No es crítico, el admin puede completar la información después
-      console.warn('No se pudo extraer información del producto automáticamente:', error.message);
+      this.logger.warn('No se pudo extraer información del producto automáticamente');
     }
 
     // Obtener el casillero activo por defecto si no se especifica
@@ -119,7 +120,7 @@ export class OrdersService {
 
     // Notificar al usuario
     this.notificationsService.notifyOrderCreated(order.id).catch(err => {
-      console.error('Error enviando notificación de pedido creado:', err);
+      this.logger.error('Error enviando notificación de pedido creado:', err);
     });
 
     return order;
@@ -128,8 +129,12 @@ export class OrdersService {
   async findAll(userId: string, isAdmin: boolean = false) {
     const where = isAdmin ? {} : { userId };
 
+    // ============================================
+    // SEGURIDAD: Limitar resultados para prevenir DoS
+    // ============================================
     return this.prisma.order.findMany({
       where,
+      take: 100, // Máximo 100 órdenes por request
       include: {
         user: {
           select: {
@@ -335,12 +340,12 @@ export class OrdersService {
             quotedAt: updateData.quotedAt,
             quotationExpiresAt: updateData.quotationExpiresAt,
           },
-        ).catch(err => console.error('Error registrando auditoría:', err));
+        ).catch(err => this.logger.error('Error registrando auditoría:', err));
       }
 
       // Notificar al usuario
       this.notificationsService.notifyQuotationReady(id).catch(err => {
-        console.error('Error enviando notificación de cotización:', err);
+        this.logger.error('Error enviando notificación de cotización:', err);
       });
     } else if (isAdmin && adminId) {
       // Registrar actualización de precios sin cotización
@@ -363,7 +368,7 @@ export class OrdersService {
           serviceFee: Number(updateData.serviceFee ?? order.serviceFee),
           totalPrice: Number(updateData.totalPrice),
         },
-      ).catch(err => console.error('Error registrando auditoría:', err));
+      ).catch(err => this.logger.error('Error registrando auditoría:', err));
     }
 
     // Registrar cambios de incidencias
@@ -381,7 +386,7 @@ export class OrdersService {
           hasIssue: updateOrderDto.hasIssue ?? order.hasIssue,
           issueDescription: updateOrderDto.issueDescription ?? order.issueDescription,
         },
-      ).catch(err => console.error('Error registrando auditoría:', err));
+      ).catch(err => this.logger.error('Error registrando auditoría:', err));
     }
 
     return updatedOrder;
@@ -457,7 +462,7 @@ export class OrdersService {
 
     // Notificar al usuario
     this.notificationsService.notifyPaymentPending(id).catch(err => {
-      console.error('Error enviando notificación de pago pendiente:', err);
+      this.logger.error('Error enviando notificación de pago pendiente:', err);
     });
 
     return updatedOrder;
@@ -553,7 +558,7 @@ export class OrdersService {
 
     // Notificar cambio de estado importante
     this.notificationsService.notifyOrderStatusChanged(id, status).catch(err => {
-      console.error('Error enviando notificación de cambio de estado:', err);
+      this.logger.error('Error enviando notificación de cambio de estado:', err);
     });
 
     return updatedOrder;
@@ -567,6 +572,27 @@ export class OrdersService {
     hasIssue?: boolean;
     tags?: string[];
   }) {
+    // ============================================
+    // SEGURIDAD: Validar userId es UUID válido
+    // ============================================
+    if (filters.userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(filters.userId)) {
+      throw new BadRequestException('userId debe ser un UUID válido');
+    }
+
+    // ============================================
+    // SEGURIDAD: Validar fechas
+    // ============================================
+    if (filters.startDate && filters.endDate && filters.startDate > filters.endDate) {
+      throw new BadRequestException('La fecha de inicio no puede ser mayor que la fecha de fin');
+    }
+
+    // ============================================
+    // SEGURIDAD: Limitar tags
+    // ============================================
+    if (filters.tags && filters.tags.length > 10) {
+      throw new BadRequestException('Máximo 10 tags permitidos');
+    }
+
     const where: any = {};
 
     if (filters.status) {
@@ -597,8 +623,12 @@ export class OrdersService {
       }
     }
 
+    // ============================================
+    // SEGURIDAD: Límite de resultados para prevenir DoS
+    // ============================================
     return this.prisma.order.findMany({
       where,
+      take: 100, // Máximo 100 resultados
       include: {
         user: {
           select: {

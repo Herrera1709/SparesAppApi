@@ -1,5 +1,6 @@
-import { IsNumber, IsNotEmpty, IsEnum, IsOptional, Min, ValidateNested, IsString } from 'class-validator';
+import { IsNumber, IsNotEmpty, IsEnum, IsOptional, Min, ValidateNested, IsString, MaxLength, Matches } from 'class-validator';
 import { Type } from 'class-transformer';
+import { SanitizeString } from '../../common/security/input-sanitizer';
 
 export enum ProductCategory {
   KTM = 'KTM',
@@ -54,6 +55,9 @@ export class EstimatePricingDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(10)
+  @Matches(/^[A-Z]{2,3}$/, { message: 'País de origen debe ser un código de país válido (ej: US, CN, UK)' })
+  @SanitizeString()
   originCountry?: string; // País de origen (ej: 'US', 'CN', 'UK')
 }
 

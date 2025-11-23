@@ -17,8 +17,12 @@ export class LockersService {
   }
 
   async findAll(includeInactive: boolean = false) {
+    // ============================================
+    // SEGURIDAD: Límite de resultados para prevenir DoS
+    // ============================================
     return this.prisma.locker.findMany({
       where: includeInactive ? {} : { isActive: true },
+      take: 50, // Máximo 50 lockers
       orderBy: { createdAt: 'desc' },
     });
   }

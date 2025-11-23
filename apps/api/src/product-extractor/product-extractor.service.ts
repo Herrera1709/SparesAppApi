@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { SSRFProtectionService } from '../common/security/ssrf-protection.service';
 
 // Nota: Para producción, considerar usar APIs oficiales de Amazon/eBay
 // Este servicio usa scraping básico que puede no ser confiable a largo plazo
@@ -26,24 +27,63 @@ export interface ProductInfo {
 export class ProductExtractorService {
   private readonly logger = new Logger(ProductExtractorService.name);
 
+  constructor(private ssrfProtection: SSRFProtectionService) {}
+
   /**
    * Extrae información de un producto desde una URL
    */
   async extractProductInfo(url: string): Promise<ProductInfo> {
     try {
-      // Detectar proveedor
-      const provider = this.detectProvider(url);
-      
-      if (provider === 'AMAZON') {
-        return await this.extractFromAmazon(url);
-      } else if (provider === 'EBAY') {
-        return await this.extractFromEbay(url);
-      } else {
-        return await this.extractGeneric(url);
+      // ============================================
+      // SEGURIDAD: Validar URL contra SSRF
+      // ============================================
+      let validation;
+      try {
+        validation = this.ssrfProtection.validateUrl(url);
+      } catch (error) {
+        this.logger.error(`Error validando URL: ${error.message}`);
+        throw new BadRequestException('Error al validar la URL. Por favor, verifica que sea una URL válida.');
       }
+
+      if (!validation.isValid) {
+        this.logger.warn(`[Security] Intento de SSRF bloqueado: ${url} - ${validation.error}`);
+        throw new BadRequestException(validation.error || 'URL no permitida');
+      }
+
+      const sanitizedUrl = validation.sanitizedUrl || url;
+
+      // Detectar proveedor
+      const provider = this.detectProvider(sanitizedUrl);
+      
+      let result: ProductInfo;
+      if (provider === 'AMAZON') {
+        result = await this.extractFromAmazon(sanitizedUrl);
+      } else if (provider === 'EBAY') {
+        result = await this.extractFromEbay(sanitizedUrl);
+      } else {
+        result = await this.extractGeneric(sanitizedUrl);
+      }
+
+      // Si no se pudo extraer información, retornar un objeto básico en lugar de fallar
+      if (!result.title && !result.price) {
+        this.logger.warn(`No se pudo extraer información completa del producto: ${url}`);
+        return {
+          provider,
+          title: undefined,
+          price: undefined,
+        };
+      }
+
+      return result;
     } catch (error) {
+      // Si ya es un BadRequestException, re-lanzarlo
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      
       this.logger.error(`Error extrayendo información del producto: ${error.message}`, error.stack);
-      throw new Error(`No se pudo extraer información del producto: ${error.message}`);
+      // No exponer detalles del error interno
+      throw new BadRequestException('No se pudo extraer información del producto. Verifica que la URL sea válida y accesible.');
     }
   }
 
@@ -67,13 +107,23 @@ export class ProductExtractorService {
    */
   private async extractFromAmazon(url: string): Promise<ProductInfo> {
     try {
-      const response = await axios.get(url, {
+      // ============================================
+      // SEGURIDAD: Validar URL nuevamente antes de hacer request
+      // ============================================
+      const validation = this.ssrfProtection.validateUrl(url);
+      if (!validation.isValid) {
+        throw new BadRequestException(validation.error || 'URL no permitida');
+      }
+
+      const response = await axios.get(validation.sanitizedUrl || url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.5',
         },
         timeout: 10000,
+        maxRedirects: 5, // Limitar redirects
+        validateStatus: (status) => status >= 200 && status < 400, // Solo 2xx y 3xx
       });
 
       const $ = cheerio.load(response.data);
@@ -144,12 +194,22 @@ export class ProductExtractorService {
    */
   private async extractFromEbay(url: string): Promise<ProductInfo> {
     try {
-      const response = await axios.get(url, {
+      // ============================================
+      // SEGURIDAD: Validar URL contra SSRF
+      // ============================================
+      const validation = this.ssrfProtection.validateUrl(url);
+      if (!validation.isValid) {
+        throw new BadRequestException(validation.error || 'URL no permitida');
+      }
+
+      const response = await axios.get(validation.sanitizedUrl || url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
         timeout: 10000,
+        maxRedirects: 5,
+        validateStatus: (status) => status >= 200 && status < 400,
       });
 
       const $ = cheerio.load(response.data);
@@ -205,12 +265,22 @@ export class ProductExtractorService {
    */
   private async extractGeneric(url: string): Promise<ProductInfo> {
     try {
-      const response = await axios.get(url, {
+      // ============================================
+      // SEGURIDAD: Validar URL contra SSRF
+      // ============================================
+      const validation = this.ssrfProtection.validateUrl(url);
+      if (!validation.isValid) {
+        throw new BadRequestException(validation.error || 'URL no permitida');
+      }
+
+      const response = await axios.get(validation.sanitizedUrl || url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         },
         timeout: 10000,
+        maxRedirects: 5,
+        validateStatus: (status) => status >= 200 && status < 400,
       });
 
       const $ = cheerio.load(response.data);
@@ -253,12 +323,12 @@ export class ProductExtractorService {
    * Valida si una URL es válida para extracción
    */
   isValidProductUrl(url: string): boolean {
-    try {
-      const urlObj = new URL(url);
-      return ['http:', 'https:'].includes(urlObj.protocol);
-    } catch {
+    if (!url || typeof url !== 'string') {
       return false;
     }
+
+    const validation = this.ssrfProtection.validateUrl(url);
+    return validation.isValid;
   }
 }
 

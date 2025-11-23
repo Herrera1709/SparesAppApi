@@ -47,8 +47,12 @@ export class AddressesService {
   }
 
   async findAll(userId: string) {
+    // ============================================
+    // SEGURIDAD: Límite de resultados (máximo 3 direcciones por usuario)
+    // ============================================
     return this.prisma.address.findMany({
       where: { userId },
+      take: 10, // Límite adicional de seguridad
       orderBy: [
         { isDefault: 'desc' },
         { createdAt: 'desc' },

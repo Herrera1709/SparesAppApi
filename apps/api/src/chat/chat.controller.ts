@@ -8,12 +8,18 @@ import {
   UseGuards,
   Query,
   Req,
+  UseInterceptors,
+  UsePipes,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ChatService } from './chat.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
 import { UpdateTtlDto } from './dto/update-ttl.dto';
+import { GetConversationQueryDto } from './dto/get-conversation-query.dto';
+import { GetAdminConversationsQueryDto } from './dto/get-admin-conversations-query.dto';
+import { UpdateConversationStatusDto } from './dto/update-conversation-status.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -21,12 +27,17 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { ChatStatus } from '@prisma/client';
 import { Request } from 'express';
+import { QuerySanitizerInterceptor } from '../common/security/query-sanitizer.interceptor';
+import { ParamValidatorPipe } from '../common/security/param-validator.pipe';
 
 @Controller('chat')
+@UseInterceptors(QuerySanitizerInterceptor)
+@UsePipes(ParamValidatorPipe)
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
   // Endpoint público para crear conversación (con o sin autenticación)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('conversations')
   @UseGuards(OptionalJwtAuthGuard)
   async createConversation(
@@ -38,19 +49,21 @@ export class ChatController {
   }
 
   // Endpoint público para obtener conversación (con o sin autenticación)
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Get('conversations/:id')
   @UseGuards(OptionalJwtAuthGuard)
   async getConversation(
     @Param('id') id: string,
-    @Query('recent') recent?: string,
+    @Query() queryDto: GetConversationQueryDto,
     @CurrentUser() user?: any,
   ) {
     const userId = user?.id || null;
-    const showRecentOnly = recent === 'true';
+    const showRecentOnly = queryDto.recent === true;
     return this.chatService.getConversation(id, userId, showRecentOnly);
   }
 
   // Endpoint para usuarios autenticados: listar sus conversaciones
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Get('conversations')
   @UseGuards(JwtAuthGuard)
   async getUserConversations(@CurrentUser() user: any) {
@@ -58,6 +71,7 @@ export class ChatController {
   }
 
   // Endpoint para enviar mensaje (público, pero verifica permisos)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @Post('conversations/:id/messages')
   @UseGuards(OptionalJwtAuthGuard)
   async sendMessage(
@@ -87,12 +101,11 @@ export class ChatController {
   @Roles('ADMIN')
   async getAdminConversations(
     @CurrentUser() user: any,
-    @Query('status') status?: ChatStatus,
-    @Query('unassigned') unassigned?: string,
+    @Query() queryDto: GetAdminConversationsQueryDto,
   ) {
     return this.chatService.getAdminConversations(user.id, {
-      status,
-      unassigned: unassigned === 'true',
+      status: queryDto.status,
+      unassigned: queryDto.unassigned === true,
     });
   }
 
@@ -111,9 +124,9 @@ export class ChatController {
   @Roles('ADMIN')
   async updateConversationStatus(
     @Param('id') id: string,
-    @Body() body: { status: ChatStatus },
+    @Body() updateStatusDto: UpdateConversationStatusDto,
   ) {
-    return this.chatService.updateConversationStatus(id, body.status);
+    return this.chatService.updateConversationStatus(id, updateStatusDto.status);
   }
 
   // Horario de asistencia
