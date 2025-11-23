@@ -14,6 +14,7 @@ import { AuditModule } from './audit/audit.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ChatModule } from './chat/chat.module';
 import { ProductExtractorModule } from './product-extractor/product-extractor.module';
+import { InventoryModule } from './inventory/inventory.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { ProductExtractorModule } from './product-extractor/product-extractor.mo
     NotificationsModule,
     ChatModule,
     ProductExtractorModule,
+    InventoryModule,
   ],
 })
 export class AppModule {}

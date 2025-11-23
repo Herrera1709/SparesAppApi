@@ -6,6 +6,7 @@ import { OrderStatus, Prisma } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AuditService } from '../audit/audit.service';
 import { ProductExtractorService } from '../product-extractor/product-extractor.service';
+import { InventoryService } from '../inventory/inventory.service';
 
 @Injectable()
 export class OrdersService {
@@ -15,6 +16,7 @@ export class OrdersService {
     private notificationsService: NotificationsService,
     private auditService: AuditService,
     private productExtractorService: ProductExtractorService,
+    private inventoryService: InventoryService,
   ) {}
 
   async create(userId: string, createOrderDto: CreateOrderDto) {
@@ -527,8 +529,27 @@ export class OrdersService {
           },
         },
         payments: true, // Incluir pagos
+        product: true, // Incluir producto si está relacionado
       },
     });
+
+    // Si el estado cambió a DELIVERED y hay un producto relacionado, descontar del inventario
+    if (status === OrderStatus.DELIVERED && order.status !== OrderStatus.DELIVERED) {
+      if (updatedOrder.productId && updatedOrder.product) {
+        try {
+          await this.inventoryService.deductInventoryForOrder(
+            id,
+            updatedOrder.productId,
+            updatedOrder.quantity,
+            adminId,
+          );
+        } catch (error) {
+          // Log el error pero no fallar la actualización del estado
+          console.error('Error descontando inventario al entregar orden:', error);
+          // Opcionalmente, podrías revertir el estado o notificar al admin
+        }
+      }
+    }
 
     // Notificar cambio de estado importante
     this.notificationsService.notifyOrderStatusChanged(id, status).catch(err => {

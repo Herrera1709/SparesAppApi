@@ -5,6 +5,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuditModule } from '../audit/audit.module';
 import { ProductExtractorModule } from '../product-extractor/product-extractor.module';
+import { InventoryModule } from '../inventory/inventory.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { ProductExtractorModule } from '../product-extractor/product-extractor.m
     forwardRef(() => NotificationsModule),
     AuditModule,
     ProductExtractorModule,
+    InventoryModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

@@ -10,6 +10,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Configuración del seed
+// Ejecutar con: npm run prisma:seed
+
 // Modelo de Usuario
 model User {
   id               String    @id @default(uuid())
@@ -34,6 +37,7 @@ model User {
   chatConversationsAsUser  ChatConversation[]   @relation("ChatUser")
   chatConversationsAsAdmin ChatConversation[]   @relation("ChatAdmin")
   chatMessages             ChatMessage[]
+  inventoryMovements       InventoryMovement[]  @relation("InventoryMovementsPerformedBy")
 
   @@map("users")
 }
@@ -126,6 +130,8 @@ model Order {
   user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   address        Address?             @relation(fields: [addressId], references: [id], onDelete: SetNull)
   locker         Locker?              @relation(fields: [lockerId], references: [id], onDelete: SetNull)
+  productId      String?              // ID del producto relacionado (opcional)
+  product        Product?              @relation(fields: [productId], references: [id], onDelete: SetNull)
   statusHistory  OrderStatusHistory[]
   payments       Payment[]
   supportTickets SupportTicket[]
@@ -362,4 +368,83 @@ model ChatSettings {
   updatedAt   DateTime @updatedAt
 
   @@map("chat_settings")
+}
+
+// Modelo de Producto
+model Product {
+  id          String   @id @default(uuid())
+  sku         String   @unique // Código SKU único
+  name        String   // Nombre del producto
+  description String?  // Descripción del producto
+  category    String?  // Categoría del producto
+  brand       String?  // Marca
+  price       Decimal  @default(0) // Precio unitario en USD
+  cost        Decimal  @default(0) // Costo unitario en USD
+  imageUrl    String?  // URL de la imagen
+  barcode     String?  // Código de barras
+  isActive    Boolean  @default(true) // Producto activo/inactivo
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relaciones
+  inventoryItems Inventory[]
+  movements      InventoryMovement[]
+  orders         Order[]
+
+  @@map("products")
+}
+
+// Modelo de Inventario
+model Inventory {
+  id              String   @id @default(uuid())
+  productId       String
+  quantity        Int      @default(0) // Cantidad actual en stock
+  minQuantity     Int      @default(0) // Cantidad mínima (punto de reorden)
+  maxQuantity     Int?     // Cantidad máxima
+  location        String?  // Ubicación en almacén (ej: "A-1-2", "B-3-4")
+  warehouse       String?  // Almacén o bodega
+  reservedQuantity Int     @default(0) // Cantidad reservada (en órdenes pendientes)
+  lastRestockedAt DateTime? // Última vez que se reabasteció
+  notes           String?  // Notas adicionales
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relaciones
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  movements InventoryMovement[]
+
+  @@unique([productId, location, warehouse])
+  @@map("inventory")
+}
+
+// Modelo de Movimientos de Inventario
+model InventoryMovement {
+  id            String            @id @default(uuid())
+  inventoryId   String
+  productId     String
+  type          InventoryMovementType
+  quantity      Int // Cantidad (positiva para entradas, negativa para salidas)
+  reason        String? // Razón del movimiento
+  referenceId   String? // ID de referencia (ej: orderId para entregas)
+  referenceType String? // Tipo de referencia (ORDER, ADJUSTMENT, RESTOCK, etc.)
+  performedBy   String? // ID del usuario/admin que realizó el movimiento
+  notes         String? // Notas adicionales
+  createdAt     DateTime @default(now())
+
+  // Relaciones
+  inventory Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  performedByUser User? @relation("InventoryMovementsPerformedBy", fields: [performedBy], references: [id], onDelete: SetNull)
+
+  @@map("inventory_movements")
+}
+
+enum InventoryMovementType {
+  IN // Entrada (compra, reabastecimiento, ajuste positivo)
+  OUT // Salida (venta, entrega, ajuste negativo)
+  ADJUSTMENT // Ajuste manual
+  TRANSFER // Transferencia entre ubicaciones
+  RETURN // Devolución
+  DAMAGED // Producto dañado
+  EXPIRED // Producto vencido
 }
