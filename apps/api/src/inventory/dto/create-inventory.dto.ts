@@ -1,8 +1,10 @@
-import { IsString, IsOptional, IsNumber, Min, IsInt } from 'class-validator';
+import { IsString, IsOptional, IsNumber, Min, IsInt, MaxLength, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
+import { SanitizeString } from '../../common/security/input-sanitizer';
 
 export class CreateInventoryDto {
   @IsString()
+  @IsUUID()
   productId: string;
 
   @IsInt()
@@ -25,14 +27,20 @@ export class CreateInventoryDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(100)
+  @SanitizeString()
   location?: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(100)
+  @SanitizeString()
   warehouse?: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(500)
+  @SanitizeString()
   notes?: string;
 }
 
