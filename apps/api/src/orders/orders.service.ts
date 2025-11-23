@@ -502,12 +502,17 @@ export class OrdersService {
     ).catch(err => console.error('Error registrando auditoría:', err));
 
     // Actualizar el pedido
-    const updatedOrder = await this.prisma.order.update({
+    await this.prisma.order.update({
       where: { id },
       data: {
         status,
         trackingNumber: trackingNumber || order.trackingNumber,
       },
+    });
+
+    // Obtener el pedido actualizado con todas las relaciones
+    const updatedOrder = await this.prisma.order.findUnique({
+      where: { id },
       include: {
         user: {
           select: {
@@ -537,6 +542,10 @@ export class OrdersService {
         product: true, // Incluir producto si está relacionado
       },
     });
+
+    if (!updatedOrder) {
+      throw new NotFoundException(`Pedido con ID ${id} no encontrado`);
+    }
 
     // Si el estado cambió a DELIVERED y hay un producto relacionado, descontar del inventario
     if (status === OrderStatus.DELIVERED && order.status !== OrderStatus.DELIVERED) {

@@ -15,20 +15,20 @@ datasource db {
 
 // Modelo de Usuario
 model User {
-  id                          String    @id @default(uuid())
-  email                       String    @unique
-  password                    String // Hash de la contraseña
-  firstName                   String?
-  lastName                    String?
-  phone                       String?
-  role                        UserRole  @default(USER)
-  emailVerified               Boolean   @default(false) // Email verificado
-  emailVerificationToken      String? // Token para verificación de email
+  id                           String    @id @default(uuid())
+  email                        String    @unique
+  password                     String // Hash de la contraseña
+  firstName                    String?
+  lastName                     String?
+  phone                        String?
+  role                         UserRole  @default(USER)
+  emailVerified                Boolean   @default(false) // Email verificado
+  emailVerificationToken       String? // Token para verificación de email
   emailVerificationTokenExpiry DateTime? // Expiración del token de verificación
-  resetToken                  String? // Token para reset de contraseña
-  resetTokenExpiry            DateTime? // Expiración del token
-  createdAt                   DateTime  @default(now())
-  updatedAt                   DateTime  @updatedAt
+  resetToken                   String? // Token para reset de contraseña
+  resetTokenExpiry             DateTime? // Expiración del token
+  createdAt                    DateTime  @default(now())
+  updatedAt                    DateTime  @updatedAt
 
   // Relaciones
   addresses                Address[]
@@ -133,8 +133,8 @@ model Order {
   user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   address        Address?             @relation(fields: [addressId], references: [id], onDelete: SetNull)
   locker         Locker?              @relation(fields: [lockerId], references: [id], onDelete: SetNull)
-  productId      String?              // ID del producto relacionado (opcional)
-  product        Product?              @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productId      String? // ID del producto relacionado (opcional)
+  product        Product?             @relation(fields: [productId], references: [id], onDelete: SetNull)
   statusHistory  OrderStatusHistory[]
   payments       Payment[]
   supportTickets SupportTicket[]
@@ -365,8 +365,8 @@ model ChatSupportSchedule {
 model ChatSettings {
   id          String   @id @default(uuid())
   key         String   @unique // Clave única de la configuración
-  value       String   // Valor de la configuración
-  description String?  // Descripción de la configuración
+  value       String // Valor de la configuración
+  description String? // Descripción de la configuración
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -377,14 +377,14 @@ model ChatSettings {
 model Product {
   id          String   @id @default(uuid())
   sku         String   @unique // Código SKU único
-  name        String   // Nombre del producto
-  description String?  // Descripción del producto
-  category    String?  // Categoría del producto
-  brand       String?  // Marca
+  name        String // Nombre del producto
+  description String? // Descripción del producto
+  category    String? // Categoría del producto
+  brand       String? // Marca
   price       Decimal  @default(0) // Precio unitario en USD
   cost        Decimal  @default(0) // Costo unitario en USD
-  imageUrl    String?  // URL de la imagen
-  barcode     String?  // Código de barras
+  imageUrl    String? // URL de la imagen
+  barcode     String? // Código de barras
   isActive    Boolean  @default(true) // Producto activo/inactivo
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -399,21 +399,21 @@ model Product {
 
 // Modelo de Inventario
 model Inventory {
-  id              String   @id @default(uuid())
-  productId       String
-  quantity        Int      @default(0) // Cantidad actual en stock
-  minQuantity     Int      @default(0) // Cantidad mínima (punto de reorden)
-  maxQuantity     Int?     // Cantidad máxima
-  location        String?  // Ubicación en almacén (ej: "A-1-2", "B-3-4")
-  warehouse       String?  // Almacén o bodega
-  reservedQuantity Int     @default(0) // Cantidad reservada (en órdenes pendientes)
-  lastRestockedAt DateTime? // Última vez que se reabasteció
-  notes           String?  // Notas adicionales
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id               String    @id @default(uuid())
+  productId        String
+  quantity         Int       @default(0) // Cantidad actual en stock
+  minQuantity      Int       @default(0) // Cantidad mínima (punto de reorden)
+  maxQuantity      Int? // Cantidad máxima
+  location         String? // Ubicación en almacén (ej: "A-1-2", "B-3-4")
+  warehouse        String? // Almacén o bodega
+  reservedQuantity Int       @default(0) // Cantidad reservada (en órdenes pendientes)
+  lastRestockedAt  DateTime? // Última vez que se reabasteció
+  notes            String? // Notas adicionales
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   // Relaciones
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
   movements InventoryMovement[]
 
   @@unique([productId, location, warehouse])
@@ -422,7 +422,7 @@ model Inventory {
 
 // Modelo de Movimientos de Inventario
 model InventoryMovement {
-  id            String            @id @default(uuid())
+  id            String                @id @default(uuid())
   inventoryId   String
   productId     String
   type          InventoryMovementType
@@ -432,12 +432,12 @@ model InventoryMovement {
   referenceType String? // Tipo de referencia (ORDER, ADJUSTMENT, RESTOCK, etc.)
   performedBy   String? // ID del usuario/admin que realizó el movimiento
   notes         String? // Notas adicionales
-  createdAt     DateTime @default(now())
+  createdAt     DateTime              @default(now())
 
   // Relaciones
-  inventory Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
-  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
-  performedByUser User? @relation("InventoryMovementsPerformedBy", fields: [performedBy], references: [id], onDelete: SetNull)
+  inventory       Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  product         Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  performedByUser User?     @relation("InventoryMovementsPerformedBy", fields: [performedBy], references: [id], onDelete: SetNull)
 
   @@map("inventory_movements")
 }
