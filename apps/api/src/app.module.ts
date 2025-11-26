@@ -18,6 +18,7 @@ import { ProductExtractorModule } from './product-extractor/product-extractor.mo
 import { InventoryModule } from './inventory/inventory.module';
 import { SecurityModule } from './common/security/security.module';
 import { GlobalExceptionFilter } from './common/security/error-handler.filter';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { GlobalExceptionFilter } from './common/security/error-handler.filter';
     ChatModule,
     ProductExtractorModule,
     InventoryModule,
+    HealthModule,
   ],
   providers: [
     {
