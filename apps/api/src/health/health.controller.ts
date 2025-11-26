@@ -1,9 +1,9 @@
 import { Controller, Get } from '@nestjs/common';
-import { Public } from '../common/decorators/public.decorator';
+import { PublicApi } from '../common/security/public-api.decorator';
 
 @Controller('health')
+@PublicApi() // Marcar todo el controlador como público (sin API Key)
 export class HealthController {
-  @Public()
   @Get()
   check() {
     return {
@@ -15,7 +15,6 @@ export class HealthController {
     };
   }
 
-  @Public()
   @Get('ping')
   ping() {
     return {
