@@ -23,6 +23,11 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   // ============================================
+  // Prefijo global para todos los endpoints
+  // ============================================
+  app.setGlobalPrefix('api');
+
+  // ============================================
   // SEGURIDAD: Helmet - Headers de Seguridad
   // ============================================
   app.use(helmet({
