@@ -34,6 +34,23 @@ export class OriginValidatorGuard implements CanActivate {
     const origin = request.headers.origin as string;
     const referer = request.headers.referer as string;
     const ip = this.getClientIp(request);
+    const userAgent = request.headers['user-agent'] as string;
+    const path = request.path || request.url;
+
+    // ============================================
+    // EXCEPCIÓN: Health Check del ALB de AWS
+    // ============================================
+    // Permitir requests sin Origin/Referer si:
+    // 1. La ruta es /api/health o empieza por /api/health
+    // 2. El User-Agent contiene ELB-HealthChecker
+    const isHealthEndpoint = path?.includes('/health') || path?.startsWith('/api/health');
+    const isHealthChecker = userAgent?.includes('ELB-HealthChecker');
+    
+    if (isHealthEndpoint || isHealthChecker) {
+      // Permitir sin validar Origin/Referer
+      // No loguear ni lanzar excepción
+      return true;
+    }
 
     // En desarrollo, permitir acceso desde localhost sin validación estricta
     const isDevelopment = process.env.NODE_ENV !== 'production';
