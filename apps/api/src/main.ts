@@ -84,29 +84,41 @@ async function bootstrap() {
   // ============================================
   // SEGURIDAD: CORS Configurado de forma segura y estricta
   // ============================================
-  const allowedOrigins = configService.get<string>('CORS_ORIGIN')?.split(',') || ['http://localhost:4200'];
-  const allowedOriginsStrict = configService.get<string>('ALLOWED_ORIGINS')?.split(',') || allowedOrigins;
+  const allowedOrigins = configService.get<string>('CORS_ORIGIN')?.split(',').map(o => o.trim()) || ['http://localhost:4200'];
+  const allowedOriginsStrict = configService.get<string>('ALLOWED_ORIGINS')?.split(',').map(o => o.trim()) || allowedOrigins;
+  
+  // Log de orígenes permitidos (solo en desarrollo)
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[CORS] Orígenes permitidos:', allowedOriginsStrict);
+  }
   
   app.enableCors({
     origin: (origin, callback) => {
+      // ============================================
+      // EXCEPCIÓN: Requests sin origin (health checks, etc.)
+      // ============================================
       // Permitir requests sin origin:
       // 1. Health checker de AWS ELB (no envía Origin header)
       // 2. Desarrollo local
-      // NOTA: En producción, permitir sin origin es seguro porque:
-      // - El health checker de AWS solo llama a /health (endpoint público)
-      // - Las requests vienen de dentro de la VPC de AWS
-      // - No hay riesgo de CSRF porque no hay cookies/sesiones en health checks
+      // 3. Requests OPTIONS (preflight) pueden no tener origin en algunos casos
       if (!origin) {
         return callback(null, true);
       }
       
+      // ============================================
       // Validar contra lista de orígenes permitidos
+      // ============================================
       const isValidOrigin = allowedOriginsStrict.some(allowed => {
-        if (allowed.includes('*')) {
-          const pattern = allowed.replace(/\*/g, '.*');
-          return new RegExp(`^${pattern}$`).test(origin);
+        const trimmedAllowed = allowed.trim();
+        if (trimmedAllowed.includes('*')) {
+          const pattern = trimmedAllowed.replace(/\*/g, '.*');
+          try {
+            return new RegExp(`^${pattern}$`).test(origin);
+          } catch {
+            return false;
+          }
         }
-        return origin === allowed;
+        return origin === trimmedAllowed;
       });
       
       if (isValidOrigin) {
@@ -115,6 +127,7 @@ async function bootstrap() {
         // Logger se inicializa después, usar console solo en desarrollo
         if (process.env.NODE_ENV !== 'production') {
           console.warn(`[Security] CORS bloqueado para origen: ${origin}`);
+          console.warn(`[Security] Orígenes permitidos:`, allowedOriginsStrict);
         }
         callback(new Error('No permitido por CORS'));
       }
