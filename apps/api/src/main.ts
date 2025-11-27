@@ -124,11 +124,10 @@ async function bootstrap() {
       if (isValidOrigin) {
         callback(null, true);
       } else {
-        // Logger se inicializa después, usar console solo en desarrollo
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn(`[Security] CORS bloqueado para origen: ${origin}`);
-          console.warn(`[Security] Orígenes permitidos:`, allowedOriginsStrict);
-        }
+        // Log temporal para debug (eliminar después de solucionar)
+        console.error(`[CORS ERROR] Origen rechazado: ${origin}`);
+        console.error(`[CORS ERROR] Orígenes permitidos:`, allowedOriginsStrict);
+        console.error(`[CORS ERROR] ALLOWED_ORIGINS env:`, configService.get<string>('ALLOWED_ORIGINS'));
         callback(new Error('No permitido por CORS'));
       }
     },
