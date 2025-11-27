@@ -89,21 +89,14 @@ async function bootstrap() {
   
   app.enableCors({
     origin: (origin, callback) => {
-      // Permitir requests sin origin en estos casos:
-      // 1. Health checker de AWS ELB (no envía Origin) - se detecta por User-Agent
+      // Permitir requests sin origin:
+      // 1. Health checker de AWS ELB (no envía Origin header)
       // 2. Desarrollo local
+      // NOTA: En producción, permitir sin origin es seguro porque:
+      // - El health checker de AWS solo llama a /health (endpoint público)
+      // - Las requests vienen de dentro de la VPC de AWS
+      // - No hay riesgo de CSRF porque no hay cookies/sesiones en health checks
       if (!origin) {
-        // En desarrollo, permitir sin origin
-        if (process.env.NODE_ENV !== 'production') {
-          return callback(null, true);
-        }
-        
-        // En producción, permitir sin origin solo si es health checker
-        // El health checker se identifica por no tener Origin y tener User-Agent: ELB-HealthChecker
-        // Como no podemos acceder al request aquí, usamos una heurística:
-        // Si no hay origin en producción, probablemente es un health check interno
-        // Permitimos pero con precaución - solo para endpoints /health
-        // NOTA: Esto es seguro porque el health checker solo llama a /health
         return callback(null, true);
       }
       
