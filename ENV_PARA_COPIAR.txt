@@ -1,20 +1,13 @@
 # ============================================
-# CONFIGURACIÓN DE PRODUCCIÓN
-# SparesApp API - Variables de Entorno
+# ARCHIVO .env COMPLETO PARA PRODUCCIÓN
+# Copia este contenido a tu archivo .env en EC2
 # ============================================
 
-# ============================================
-# ENTORNO
-# ============================================
 NODE_ENV=production
-
-# ============================================
-# SERVIDOR
-# ============================================
 PORT=3000
 
 # ============================================
-# BASE DE DATOS (PostgreSQL) - RDS AWS
+# BASE DE DATOS - RDS AWS (CORREGIDO)
 # ============================================
 DATABASE_URL=postgresql://postgres:Ronaldonazario4090@spareapp-db.czksgy6uo0rq.us-east-1.rds.amazonaws.com:5432/sparesapp_db?schema=public&sslmode=require
 
@@ -33,7 +26,8 @@ APP_IDS=spares-app-web
 # ============================================
 # SEGURIDAD - CORS - Dominios Permitidos
 # ============================================
-# Producción: app.importacr.com, CloudFront: https://d3borb3tbumsnf.cloudfront.net
+# Producción: app.importacr.com
+# CloudFront: https://d3borb3tbumsnf.cloudfront.net
 # Desarrollo: http://localhost:4200
 CORS_ORIGIN=https://app.importacr.com,https://d3borb3tbumsnf.cloudfront.net,http://localhost:4200
 ALLOWED_ORIGINS=https://app.importacr.com,https://d3borb3tbumsnf.cloudfront.net,http://localhost:4200
@@ -50,7 +44,7 @@ RESEND_MAX_RETRIES=5
 RESEND_DISABLE_IDEMPOTENCY=0
 
 # ============================================
-# SEGURIDAD AVANZADA - OPCIONAL
+# SEGURIDAD AVANZADA
 # ============================================
 RATE_LIMIT_MAX=100
 STRICT_ORIGIN_VALIDATION=true
@@ -58,3 +52,4 @@ REQUEST_SIGNATURE_SECRET=
 IP_WHITELIST=
 IP_BLACKLIST=
 LOG_API_ACCESS=false
+

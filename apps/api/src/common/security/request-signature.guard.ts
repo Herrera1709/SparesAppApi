@@ -24,7 +24,16 @@ export class RequestSignatureGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
+    const method = request.method;
     const ip = this.getClientIp(request);
+
+    // ============================================
+    // EXCEPCIÓN: Requests OPTIONS (CORS Preflight)
+    // ============================================
+    // Las requests OPTIONS son preflight de CORS y no requieren firma
+    if (method === 'OPTIONS') {
+      return true;
+    }
 
     // En desarrollo, permitir acceso sin validación estricta
     const isDevelopment = process.env.NODE_ENV !== 'production';

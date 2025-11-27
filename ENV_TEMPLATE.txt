@@ -24,10 +24,10 @@ PORT=3000
 # ============================================
 # BASE DE DATOS (PostgreSQL) - REQUERIDO
 # ============================================
-# Formato: postgresql://usuario:password@host:puerto/database?schema=public
-# En producción, usar SSL: ?sslmode=require
+# Formato: postgresql://usuario:password@host:puerto/database?schema=public&sslmode=require
+# En producción, SIEMPRE usar SSL: &sslmode=require
 # RDS AWS actual:
-DATABASE_URL=postgresql://postgres:Ronaldonazario4090@spareapp-db.czksgy6uo0rq.us-east-1.rds.amazonaws.com:5432/postgres?schema=public
+DATABASE_URL=postgresql://postgres:Ronaldonazario4090@spareapp-db.czksgy6uo0rq.us-east-1.rds.amazonaws.com:5432/sparesapp_db?schema=public&sslmode=require
 
 # ============================================
 # SEGURIDAD - JWT - REQUERIDO
@@ -49,18 +49,20 @@ APP_IDS=spares-app-web
 # SEGURIDAD - CORS - REQUERIDO
 # ============================================
 # URLs permitidas separadas por comas (sin espacios después de comas)
-# Solo dominios que usarán la API
-# CloudFront actual: https://d3borb3tbumsnf.cloudfront.net
-CORS_ORIGIN=https://d3borb3tbumsnf.cloudfront.net
-ALLOWED_ORIGINS=https://d3borb3tbumsnf.cloudfront.net
-ALLOWED_REFERERS=https://d3borb3tbumsnf.cloudfront.net/*
+# Dominios de producción y desarrollo
+# Producción: app.importacr.com, CloudFront: https://d3borb3tbumsnf.cloudfront.net
+# Desarrollo: http://localhost:4200
+CORS_ORIGIN=https://app.importacr.com,https://d3borb3tbumsnf.cloudfront.net,http://localhost:4200
+ALLOWED_ORIGINS=https://app.importacr.com,https://d3borb3tbumsnf.cloudfront.net,http://localhost:4200
+ALLOWED_REFERERS=https://app.importacr.com/*,https://d3borb3tbumsnf.cloudfront.net/*,http://localhost:4200/*
 
 # ============================================
 # FRONTEND - REQUERIDO
 # ============================================
 # URL completa del frontend (con https://)
-# CloudFront actual: https://d3borb3tbumsnf.cloudfront.net
-FRONTEND_URL=https://d3borb3tbumsnf.cloudfront.net
+# Dominio principal: https://app.importacr.com
+# CloudFront backup: https://d3borb3tbumsnf.cloudfront.net
+FRONTEND_URL=https://app.importacr.com
 
 # ============================================
 # EMAIL (Resend) - REQUERIDO

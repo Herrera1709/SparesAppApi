@@ -10,16 +10,15 @@
 ```typescript
 export const environment = {
   production: true,
-  apiUrl: 'http://3.238.237.181:3000/api',
+  apiUrl: 'http://api.importacr.com/api',
   apiKey: 'efdc60a3b2db5610326f5e68b1608ef1667f1545438be6ac965d5989b5bd5d69',
   appId: 'spares-app-web',
 };
 ```
 
 ### **Detalles:**
-- **URL del API:** `http://3.238.237.181:3000/api`
-  - IP del servidor EC2: `3.238.237.181`
-  - Puerto: `3000`
+- **URL del API:** `http://api.importacr.com/api`
+  - Dominio: `api.importacr.com`
   - Prefijo global: `/api` (agregado automáticamente por el backend)
   
 - **API Key:** `efdc60a3b2db5610326f5e68b1608ef1667f1545438be6ac965d5989b5bd5d69`
@@ -37,9 +36,9 @@ export const environment = {
    - Header `X-App-Id` con el app ID
    - Header `Authorization: Bearer <token>` si el usuario está autenticado
 3. Ejemplo de requests:
-   - Login: `POST http://3.238.237.181:3000/api/auth/login`
-   - Orders: `GET http://3.238.237.181:3000/api/orders`
-   - Inventory: `GET http://3.238.237.181:3000/api/inventory/products`
+   - Login: `POST http://api.importacr.com/api/auth/login`
+   - Orders: `GET http://api.importacr.com/api/orders`
+   - Inventory: `GET http://api.importacr.com/api/inventory/products`
 
 ---
 
@@ -112,17 +111,20 @@ LOG_API_ACCESS=false
   - Opcional pero recomendado para tracking
 
 #### **2. CORS (Cross-Origin Resource Sharing)**
-- **`CORS_ORIGIN`:** `https://d3borb3tbumsnf.cloudfront.net`
-- **`ALLOWED_ORIGINS`:** `https://d3borb3tbumsnf.cloudfront.net`
-  - Solo permite requests desde CloudFront
+- **`CORS_ORIGIN`:** `https://app.importacr.com,https://d3borb3tbumsnf.cloudfront.net,http://localhost:4200`
+- **`ALLOWED_ORIGINS`:** `https://app.importacr.com,https://d3borb3tbumsnf.cloudfront.net,http://localhost:4200`
+  - Permite requests desde:
+    - Producción: `app.importacr.com` (dominio principal)
+    - CloudFront: `https://d3borb3tbumsnf.cloudfront.net` (backup)
+    - Desarrollo: `http://localhost:4200`
   - El backend valida el header `Origin` de cada request
   - Si el origen no está en la lista, rechaza con error CORS
 
-- **`ALLOWED_REFERERS`:** `https://d3borb3tbumsnf.cloudfront.net/*`
+- **`ALLOWED_REFERERS`:** `https://app.importacr.com/*,https://d3borb3tbumsnf.cloudfront.net/*,http://localhost:4200/*`
   - Valida el header `Referer` (opcional)
 
-- **`FRONTEND_URL`:** `https://d3borb3tbumsnf.cloudfront.net`
-  - URL base del frontend para redirecciones
+- **`FRONTEND_URL`:** `https://app.importacr.com`
+  - URL base del frontend para redirecciones (dominio principal)
 
 #### **3. Prefijo Global del API**
 - El backend tiene configurado: `app.setGlobalPrefix('api')`
@@ -142,20 +144,20 @@ LOG_API_ACCESS=false
 ### **1. Request desde Frontend (CloudFront) → Backend (EC2)**
 
 ```
-Frontend (https://d3borb3tbumsnf.cloudfront.net)
+Frontend (https://app.importacr.com)
     ↓
 Request HTTP:
-  - URL: http://3.238.237.181:3000/api/auth/login
+  - URL: http://api.importacr.com/api/auth/login
   - Headers:
-    - Origin: https://d3borb3tbumsnf.cloudfront.net
+    - Origin: https://app.importacr.com
     - X-API-Key: efdc60a3b2db5610326f5e68b1608ef1667f1545438be6ac965d5989b5bd5d69
     - X-App-Id: spares-app-web
     - Content-Type: application/json
     ↓
-Backend (EC2 - 3.238.237.181:3000)
+Backend (api.importacr.com)
     ↓
 Validaciones:
-  1. ✅ CORS: Origin permitido? → SÍ (https://d3borb3tbumsnf.cloudfront.net)
+  1. ✅ CORS: Origin permitido? → SÍ (https://app.importacr.com)
   2. ✅ API Key: X-API-Key válida? → SÍ (coincide con API_KEYS)
   3. ✅ App ID: X-App-Id válido? → SÍ (coincide con APP_IDS)
   4. ✅ Rate Limit: Dentro del límite? → Verificar
@@ -187,20 +189,20 @@ Validaciones:
 
 ## ✅ **CHECKLIST DE CONFIGURACIÓN**
 
-### **Frontend (S3/CloudFront):**
-- [x] `apiUrl` configurado: `http://3.238.237.181:3000/api`
+### **Frontend (app.importacr.com):**
+- [x] `apiUrl` configurado: `http://api.importacr.com/api`
 - [x] `apiKey` configurada: `efdc60a3b2db5610326f5e68b1608ef1667f1545438be6ac965d5989b5bd5d69`
 - [x] `appId` configurado: `spares-app-web`
 - [x] Build de producción generado
-- [ ] Desplegado en S3/CloudFront
+- [ ] Desplegado en app.importacr.com
 
-### **Backend (EC2):**
+### **Backend (EC2 - api.importacr.com):**
 - [x] `API_KEYS` configurado: `efdc60a3b2db5610326f5e68b1608ef1667f1545438be6ac965d5989b5bd5d69`
 - [x] `APP_IDS` configurado: `spares-app-web`
-- [x] `CORS_ORIGIN` configurado: `https://d3borb3tbumsnf.cloudfront.net`
-- [x] `ALLOWED_ORIGINS` configurado: `https://d3borb3tbumsnf.cloudfront.net`
-- [x] `ALLOWED_REFERERS` configurado: `https://d3borb3tbumsnf.cloudfront.net/*`
-- [x] `FRONTEND_URL` configurado: `https://d3borb3tbumsnf.cloudfront.net`
+- [x] `CORS_ORIGIN` configurado: `https://app.importacr.com,https://d3borb3tbumsnf.cloudfront.net,http://localhost:4200`
+- [x] `ALLOWED_ORIGINS` configurado: `https://app.importacr.com,https://d3borb3tbumsnf.cloudfront.net,http://localhost:4200`
+- [x] `ALLOWED_REFERERS` configurado: `https://app.importacr.com/*,https://d3borb3tbumsnf.cloudfront.net/*,http://localhost:4200/*`
+- [x] `FRONTEND_URL` configurado: `https://app.importacr.com`
 - [x] `DATABASE_URL` configurado (RDS AWS)
 - [ ] Servidor corriendo en EC2 (puerto 3000)
 - [ ] Prefijo global `/api` activo
@@ -215,7 +217,10 @@ Validaciones:
 
 ### **Error: CORS bloqueado**
 - **Causa:** El origen de la request no está en `ALLOWED_ORIGINS`
-- **Solución:** Verificar que `ALLOWED_ORIGINS` incluya `https://d3borb3tbumsnf.cloudfront.net`
+- **Solución:** Verificar que `ALLOWED_ORIGINS` incluya:
+  - `https://app.importacr.com` (dominio principal)
+  - `https://d3borb3tbumsnf.cloudfront.net` (CloudFront backup)
+  - `http://localhost:4200` (desarrollo)
 
 ### **Error: 404 Not Found**
 - **Causa:** La ruta no tiene el prefijo `/api`
@@ -250,13 +255,13 @@ cat .env | grep ALLOWED_ORIGINS
 ### **Probar desde terminal:**
 ```bash
 # Health check (endpoint público, no requiere API key)
-curl http://3.238.237.181:3000/api/health
+curl http://api.importacr.com/api/health
 
 # Test con API key
 curl -H "X-API-Key: efdc60a3b2db5610326f5e68b1608ef1667f1545438be6ac965d5989b5bd5d69" \
      -H "X-App-Id: spares-app-web" \
-     -H "Origin: https://d3borb3tbumsnf.cloudfront.net" \
-     http://3.238.237.181:3000/api/health
+     -H "Origin: https://app.importacr.com" \
+     http://api.importacr.com/api/health
 ```
 
 ---
@@ -267,16 +272,19 @@ curl -H "X-API-Key: efdc60a3b2db5610326f5e68b1608ef1667f1545438be6ac965d5989b5bd
 |----------|---------------|--------|
 | `apiKey` | `API_KEYS` | ✅ Deben ser **idénticos** |
 | `appId` | `APP_IDS` | ✅ Deben ser **idénticos** |
-| `apiUrl` (origen) | `ALLOWED_ORIGINS` | ✅ CloudFront debe estar en la lista |
-| `apiUrl` (destino) | `PORT` | ✅ Puerto 3000 |
+| `apiUrl` | `http://api.importacr.com/api` | ✅ Dominio configurado |
+| `Origin: app.importacr.com` | `ALLOWED_ORIGINS` | ✅ Debe estar en la lista |
+| `Origin: CloudFront` | `ALLOWED_ORIGINS` | ✅ Backup en la lista |
+| `Origin: localhost:4200` | `ALLOWED_ORIGINS` | ✅ Desarrollo en la lista |
 
 ---
 
 ## 📍 **URLs IMPORTANTES**
 
-- **Frontend (CloudFront):** `https://d3borb3tbumsnf.cloudfront.net`
-- **Backend API (EC2):** `http://3.238.237.181:3000/api`
-- **Health Check:** `http://3.238.237.181:3000/api/health`
+- **Frontend (Producción):** `https://app.importacr.com`
+- **Frontend (CloudFront Backup):** `https://d3borb3tbumsnf.cloudfront.net`
+- **Backend API:** `http://api.importacr.com/api`
+- **Health Check:** `http://api.importacr.com/api/health`
 - **Base de Datos (RDS):** `spareapp-db.czksgy6uo0rq.us-east-1.rds.amazonaws.com:5432`
 
 ---

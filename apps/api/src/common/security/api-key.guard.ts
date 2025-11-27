@@ -35,6 +35,18 @@ export class ApiKeyGuard implements CanActivate {
   }
 
   canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest<Request>();
+    const method = request.method;
+
+    // ============================================
+    // EXCEPCIÓN: Requests OPTIONS (CORS Preflight)
+    // ============================================
+    // Las requests OPTIONS son preflight de CORS y no requieren API key
+    // CORS manejará la validación del origen
+    if (method === 'OPTIONS') {
+      return true;
+    }
+
     // Verificar si el endpoint está marcado como público
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_API_KEY, [
       context.getHandler(),
@@ -45,12 +57,10 @@ export class ApiKeyGuard implements CanActivate {
     if (isPublic) {
       // En desarrollo, loggear para debugging
       if (process.env.NODE_ENV !== 'production') {
-        const request = context.switchToHttp().getRequest<Request>();
         this.logger.debug(`[ApiKeyGuard] Endpoint público detectado: ${request.method} ${request.path}`);
       }
       return true;
     }
-    const request = context.switchToHttp().getRequest<Request>();
     const apiKey = request.headers[this.apiKeyHeader.toLowerCase()] as string;
     const appId = request.headers[this.appIdHeader.toLowerCase()] as string;
 

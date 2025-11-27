@@ -36,6 +36,16 @@ export class OriginValidatorGuard implements CanActivate {
     const ip = this.getClientIp(request);
     const userAgent = request.headers['user-agent'] as string;
     const path = request.path || request.url;
+    const method = request.method;
+
+    // ============================================
+    // EXCEPCIÓN: Requests OPTIONS (CORS Preflight)
+    // ============================================
+    // Las requests OPTIONS son preflight de CORS y deben ser permitidas
+    // CORS manejará la validación del origen
+    if (method === 'OPTIONS') {
+      return true;
+    }
 
     // ============================================
     // EXCEPCIÓN: Health Check del ALB de AWS
