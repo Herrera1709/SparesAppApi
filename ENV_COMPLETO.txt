@@ -1,0 +1,58 @@
+# ============================================
+# CONFIGURACIÓN DE PRODUCCIÓN
+# SparesApp API - Variables de Entorno
+# ============================================
+
+# ============================================
+# ENTORNO
+# ============================================
+NODE_ENV=production
+
+# ============================================
+# SERVIDOR
+# ============================================
+PORT=3000
+
+# ============================================
+# BASE DE DATOS (PostgreSQL) - RDS AWS
+# ============================================
+DATABASE_URL=postgresql://postgres:Ronaldonazario4090@spareapp-db.czksgy6uo0rq.us-east-1.rds.amazonaws.com:5432/postgres?schema=public
+
+# ============================================
+# SEGURIDAD - JWT
+# ============================================
+JWT_SECRET=tu-jwt-secret-aqui
+JWT_EXPIRES_IN=24h
+
+# ============================================
+# SEGURIDAD - API KEYS
+# ============================================
+API_KEYS=efdc60a3b2db5610326f5e68b1608ef1667f1545438be6ac965d5989b5bd5d69
+APP_IDS=spares-app-web
+
+# ============================================
+# SEGURIDAD - CORS - CloudFront
+# ============================================
+CORS_ORIGIN=https://d3borb3tbumsnf.cloudfront.net
+ALLOWED_ORIGINS=https://d3borb3tbumsnf.cloudfront.net
+ALLOWED_REFERERS=https://d3borb3tbumsnf.cloudfront.net/*
+FRONTEND_URL=https://d3borb3tbumsnf.cloudfront.net
+
+# ============================================
+# EMAIL (Resend)
+# ============================================
+RESEND_API_KEY=re_123456789
+RESEND_FROM=tickets@tiketpass.net
+RESEND_RPS_LIMIT=2
+RESEND_MAX_RETRIES=5
+RESEND_DISABLE_IDEMPOTENCY=0
+
+# ============================================
+# SEGURIDAD AVANZADA - OPCIONAL
+# ============================================
+RATE_LIMIT_MAX=100
+STRICT_ORIGIN_VALIDATION=true
+REQUEST_SIGNATURE_SECRET=
+IP_WHITELIST=
+IP_BLACKLIST=
+LOG_API_ACCESS=false

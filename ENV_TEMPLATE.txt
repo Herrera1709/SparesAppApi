@@ -1,0 +1,130 @@
+# ============================================
+# CONFIGURACIÓN DE PRODUCCIÓN
+# SparesApp API - Variables de Entorno
+# ============================================
+# 
+# INSTRUCCIONES:
+# 1. Copia este contenido a un archivo .env
+# 2. Completa todos los valores marcados como REQUERIDO
+# 3. Ajusta los valores opcionales según tus necesidades
+# 4. NUNCA commitees el archivo .env al repositorio
+#
+# ============================================
+
+# ============================================
+# ENTORNO
+# ============================================
+NODE_ENV=production
+
+# ============================================
+# SERVIDOR
+# ============================================
+PORT=3000
+
+# ============================================
+# BASE DE DATOS (PostgreSQL) - REQUERIDO
+# ============================================
+# Formato: postgresql://usuario:password@host:puerto/database?schema=public
+# En producción, usar SSL: ?sslmode=require
+# RDS AWS actual:
+DATABASE_URL=postgresql://postgres:Ronaldonazario4090@spareapp-db.czksgy6uo0rq.us-east-1.rds.amazonaws.com:5432/postgres?schema=public
+
+# ============================================
+# SEGURIDAD - JWT - REQUERIDO
+# ============================================
+# Genera un secret seguro de al menos 32 caracteres
+# Puedes usar: openssl rand -base64 32
+JWT_SECRET=tu-secret-super-seguro-minimo-32-caracteres-aleatorios-cambiar-en-produccion
+JWT_EXPIRES_IN=24h
+
+# ============================================
+# SEGURIDAD - API KEYS - REQUERIDO
+# ============================================
+# Múltiples API keys separadas por comas
+# Genera keys seguras y únicas para cada aplicación cliente
+API_KEYS=efdc60a3b2db5610326f5e68b1608ef1667f1545438be6ac965d5989b5bd5d69
+APP_IDS=spares-app-web
+
+# ============================================
+# SEGURIDAD - CORS - REQUERIDO
+# ============================================
+# URLs permitidas separadas por comas (sin espacios después de comas)
+# Solo dominios que usarán la API
+# CloudFront actual: https://d3borb3tbumsnf.cloudfront.net
+CORS_ORIGIN=https://d3borb3tbumsnf.cloudfront.net
+ALLOWED_ORIGINS=https://d3borb3tbumsnf.cloudfront.net
+ALLOWED_REFERERS=https://d3borb3tbumsnf.cloudfront.net/*
+
+# ============================================
+# FRONTEND - REQUERIDO
+# ============================================
+# URL completa del frontend (con https://)
+# CloudFront actual: https://d3borb3tbumsnf.cloudfront.net
+FRONTEND_URL=https://d3borb3tbumsnf.cloudfront.net
+
+# ============================================
+# EMAIL (Resend) - REQUERIDO
+# ============================================
+# Obtén tu API key en: https://resend.com/api-keys
+RESEND_API_KEY=re_tu-api-key-de-resend-cambiar
+RESEND_FROM=tickets@tiketpass.net
+RESEND_RPS_LIMIT=2
+RESEND_MAX_RETRIES=5
+RESEND_DISABLE_IDEMPOTENCY=0
+
+# ============================================
+# SEGURIDAD AVANZADA - OPCIONAL
+# ============================================
+
+# Rate Limiting - Requests por minuto
+# Por defecto: 100
+RATE_LIMIT_MAX=100
+
+# Validación de origen estricta
+# true = validación estricta (recomendado en producción)
+# false = validación relajada (solo desarrollo)
+STRICT_ORIGIN_VALIDATION=true
+
+# Firma de requests (opcional pero recomendado)
+# Debe ser diferente a JWT_SECRET
+REQUEST_SIGNATURE_SECRET=otro-secret-diferente-al-jwt-cambiar
+
+# Whitelist de IPs permitidas (opcional)
+# Separadas por comas, dejar vacío para permitir todas
+IP_WHITELIST=
+
+# Blacklist de IPs bloqueadas (opcional)
+# Separadas por comas
+IP_BLACKLIST=
+
+# ============================================
+# LOGGING - OPCIONAL
+# ============================================
+
+# Loggear todos los accesos a la API
+# true = loggear todos (puede ser pesado)
+# false = solo errores y eventos de seguridad
+LOG_API_ACCESS=false
+
+# ============================================
+# NOTAS DE SEGURIDAD
+# ============================================
+#
+# 1. JWT_SECRET: Debe ser único, aleatorio y de al menos 32 caracteres
+#    Generar con: openssl rand -base64 32
+#
+# 2. API_KEYS: Genera keys únicas para cada aplicación cliente
+#    Usa caracteres aleatorios y seguros
+#
+# 3. DATABASE_URL: En producción, SIEMPRE usa SSL
+#    Agrega ?sslmode=require al final
+#
+# 4. CORS: Solo incluye dominios que realmente usarán la API
+#    No uses wildcards (*) en producción
+#
+# 5. Rota las API Keys periódicamente (cada 3-6 meses)
+#
+# 6. Mantén este archivo seguro y nunca lo commitees
+#
+# ============================================
+

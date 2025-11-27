@@ -63,6 +63,27 @@ async function bootstrap() {
   app.use(urlencoded({ extended: true, limit: '5mb' }));
 
   // ============================================
+  // Middleware: Permitir Health Checker de AWS ELB sin Origin
+  // ============================================
+  const expressInstance = app.getHttpAdapter().getInstance();
+  
+  // Almacenar request temporalmente para que CORS pueda accederlo
+  expressInstance.use((req, res, next) => {
+    // Detectar health checker de AWS ELB (no envía header Origin)
+    const isHealthChecker = req.headers['user-agent']?.includes('ELB-HealthChecker');
+    const isHealthEndpoint = req.path?.includes('/health') || req.url?.includes('/health');
+    
+    // Si es health checker o endpoint de health, almacenar flag temporalmente
+    if (isHealthChecker || isHealthEndpoint) {
+      (global as any).__currentRequest = { allowWithoutOrigin: true };
+    } else {
+      (global as any).__currentRequest = null;
+    }
+    
+    next();
+  });
+
+  // ============================================
   // SEGURIDAD: CORS Configurado de forma segura y estricta
   // ============================================
   const allowedOrigins = configService.get<string>('CORS_ORIGIN')?.split(',') || ['http://localhost:4200'];
@@ -70,18 +91,26 @@ async function bootstrap() {
   
   app.enableCors({
     origin: (origin, callback) => {
-      // En producción, rechazar requests sin origin
-      if (!origin && process.env.NODE_ENV === 'production') {
-        // Logger se inicializa después, usar console solo en desarrollo
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn(`[Security] CORS bloqueado: request sin origin`);
-        }
-        return callback(new Error('Origin requerido'));
-      }
+      // Obtener el request del contexto temporal
+      const reqContext = (global as any).__currentRequest;
       
-      // Permitir requests sin origin solo en desarrollo
-      if (!origin && process.env.NODE_ENV !== 'production') {
-        return callback(null, true);
+      // Permitir requests sin origin en estos casos:
+      // 1. Health checker de AWS ELB (no envía Origin)
+      // 2. Endpoints de health check (públicos)
+      // 3. Desarrollo local
+      if (!origin) {
+        // Verificar si el request tiene el flag allowWithoutOrigin
+        if (reqContext?.allowWithoutOrigin) {
+          return callback(null, true);
+        }
+        
+        // En desarrollo, permitir sin origin
+        if (process.env.NODE_ENV !== 'production') {
+          return callback(null, true);
+        }
+        
+        // En producción, rechazar requests sin origin (excepto health checks)
+        return callback(new Error('Origin requerido'));
       }
       
       // Validar contra lista de orígenes permitidos
