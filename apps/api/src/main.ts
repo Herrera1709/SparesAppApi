@@ -85,13 +85,15 @@ async function bootstrap() {
   // SEGURIDAD: CORS Configurado de forma segura y estricta
   // ============================================
   const defaultOrigins = ['https://app.importacr.com', 'https://d3borb3tbumsnf.cloudfront.net', 'http://localhost:4200'];
-  const allowedOrigins = configService.get<string>('CORS_ORIGIN')?.split(',').map(o => o.trim()) || defaultOrigins;
-  const allowedOriginsStrict = configService.get<string>('ALLOWED_ORIGINS')?.split(',').map(o => o.trim()) || allowedOrigins;
+  const corsOriginEnv = configService.get<string>('CORS_ORIGIN')?.split(',').map(o => o.trim()).filter(Boolean) || [];
+  const allowedOriginsEnv = configService.get<string>('ALLOWED_ORIGINS')?.split(',').map(o => o.trim()).filter(Boolean) || [];
   
-  // Log de orígenes permitidos (solo en desarrollo)
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('[CORS] Orígenes permitidos:', allowedOriginsStrict);
-  }
+  // Combinar orígenes del .env con los por defecto, asegurando que app.importacr.com siempre esté incluido
+  const allowedOrigins = [...new Set([...allowedOriginsEnv, ...defaultOrigins])];
+  const allowedOriginsStrict = allowedOrigins.length > 0 ? allowedOrigins : defaultOrigins;
+  
+  // Log de orígenes permitidos
+  console.log('[CORS] Orígenes permitidos:', allowedOriginsStrict);
   
   app.enableCors({
     origin: (origin, callback) => {
@@ -125,10 +127,9 @@ async function bootstrap() {
       if (isValidOrigin) {
         callback(null, true);
       } else {
-        // Log temporal para debug (eliminar después de solucionar)
-        console.error(`[CORS ERROR] Origen rechazado: ${origin}`);
-        console.error(`[CORS ERROR] Orígenes permitidos:`, allowedOriginsStrict);
-        console.error(`[CORS ERROR] ALLOWED_ORIGINS env:`, configService.get<string>('ALLOWED_ORIGINS'));
+        // Log para debug
+        console.warn(`[CORS] Origen rechazado: ${origin}`);
+        console.warn(`[CORS] Orígenes permitidos:`, allowedOriginsStrict);
         callback(new Error('No permitido por CORS'));
       }
     },
