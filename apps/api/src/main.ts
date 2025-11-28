@@ -84,19 +84,14 @@ async function bootstrap() {
   // ============================================
   // SEGURIDAD: CORS Configurado de forma segura y estricta
   // ============================================
-  // Orígenes requeridos que SIEMPRE deben estar incluidos
-  const requiredOrigins = ['https://app.importacr.com', 'https://d3borb3tbumsnf.cloudfront.net', 'http://localhost:4200'];
+  const defaultOrigins = ['https://app.importacr.com', 'https://d3borb3tbumsnf.cloudfront.net', 'http://localhost:4200'];
+  const allowedOrigins = configService.get<string>('CORS_ORIGIN')?.split(',').map(o => o.trim()) || defaultOrigins;
+  const allowedOriginsStrict = configService.get<string>('ALLOWED_ORIGINS')?.split(',').map(o => o.trim()) || allowedOrigins;
   
-  // Obtener orígenes del .env
-  const corsOriginEnv = configService.get<string>('CORS_ORIGIN')?.split(',').map(o => o.trim()).filter(Boolean) || [];
-  const allowedOriginsEnv = configService.get<string>('ALLOWED_ORIGINS')?.split(',').map(o => o.trim()).filter(Boolean) || [];
-  
-  // Combinar orígenes del .env con los requeridos (sin duplicados)
-  const allOrigins = [...new Set([...allowedOriginsEnv, ...corsOriginEnv, ...requiredOrigins])];
-  const allowedOriginsStrict = allOrigins.length > 0 ? allOrigins : requiredOrigins;
-  
-  // Log de orígenes permitidos
-  console.log('[CORS] Orígenes permitidos:', allowedOriginsStrict);
+  // Log de orígenes permitidos (solo en desarrollo)
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[CORS] Orígenes permitidos:', allowedOriginsStrict);
+  }
   
   app.enableCors({
     origin: (origin, callback) => {
