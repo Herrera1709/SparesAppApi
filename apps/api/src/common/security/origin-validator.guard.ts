@@ -17,12 +17,16 @@ export class OriginValidatorGuard implements CanActivate {
     private configService: ConfigService,
     private securityLogger: SecurityLoggerService,
   ) {
-    // Cargar orígenes permitidos desde variables de entorno
-    const originsEnv = this.configService.get<string>('ALLOWED_ORIGINS');
-    const referersEnv = this.configService.get<string>('ALLOWED_REFERERS');
+    // Orígenes requeridos que SIEMPRE deben estar incluidos
+    const requiredOrigins = ['https://app.importacr.com', 'https://d3borb3tbumsnf.cloudfront.net', 'http://localhost:4200'];
     
-    this.allowedOrigins = originsEnv ? originsEnv.split(',').map(o => o.trim()) : [];
-    this.allowedReferers = referersEnv ? referersEnv.split(',').map(r => r.trim()) : [];
+    // Cargar orígenes permitidos desde variables de entorno
+    const originsEnv = this.configService.get<string>('ALLOWED_ORIGINS')?.split(',').map(o => o.trim()).filter(Boolean) || [];
+    const referersEnv = this.configService.get<string>('ALLOWED_REFERERS')?.split(',').map(r => r.trim()).filter(Boolean) || [];
+    
+    // Combinar orígenes del .env con los requeridos (sin duplicados)
+    this.allowedOrigins = [...new Set([...originsEnv, ...requiredOrigins])];
+    this.allowedReferers = [...new Set([...referersEnv, ...requiredOrigins])];
     
     // En producción, modo estricto por defecto
     this.strictMode = this.configService.get<string>('STRICT_ORIGIN_VALIDATION') === 'true' || 
