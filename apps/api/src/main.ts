@@ -84,7 +84,8 @@ async function bootstrap() {
   // ============================================
   // SEGURIDAD: CORS Configurado de forma segura y estricta
   // ============================================
-  const allowedOrigins = configService.get<string>('CORS_ORIGIN')?.split(',').map(o => o.trim()) || ['http://localhost:4200'];
+  const defaultOrigins = ['https://app.importacr.com', 'https://d3borb3tbumsnf.cloudfront.net', 'http://localhost:4200'];
+  const allowedOrigins = configService.get<string>('CORS_ORIGIN')?.split(',').map(o => o.trim()) || defaultOrigins;
   const allowedOriginsStrict = configService.get<string>('ALLOWED_ORIGINS')?.split(',').map(o => o.trim()) || allowedOrigins;
   
   // Log de orígenes permitidos (solo en desarrollo)
