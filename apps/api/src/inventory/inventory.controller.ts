@@ -55,7 +55,10 @@ export class InventoryController {
       search: queryDto.search,
       category: queryDto.category,
       brand: queryDto.brand,
+      vehicleId: queryDto.vehicleId,
+      vehicleVariantId: queryDto.vehicleVariantId,
       isActive: queryDto.isActive,
+      includeUniversal: queryDto.includeUniversal,
     });
   }
 

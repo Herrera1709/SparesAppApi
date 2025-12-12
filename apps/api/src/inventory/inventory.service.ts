@@ -35,15 +35,21 @@ export class InventoryService {
     search?: string;
     category?: string;
     brand?: string;
+    vehicleId?: string;
+    vehicleVariantId?: string;
     isActive?: boolean;
+    includeUniversal?: boolean;
   }) {
     try {
       const where: Prisma.ProductWhereInput = {};
 
+      // Búsqueda por texto (nombre, SKU, partNumber, OEM)
       if (filters?.search) {
         where.OR = [
           { name: { contains: filters.search, mode: 'insensitive' } },
           { sku: { contains: filters.search, mode: 'insensitive' } },
+          { partNumber: { contains: filters.search, mode: 'insensitive' } },
+          { oemNumber: { contains: filters.search, mode: 'insensitive' } },
           { description: { contains: filters.search, mode: 'insensitive' } },
           { barcode: { contains: filters.search, mode: 'insensitive' } },
         ];
@@ -61,6 +67,35 @@ export class InventoryService {
         where.isActive = filters.isActive;
       }
 
+      // ============================================
+      // FILTRAR POR COMPATIBILIDAD DE VEHÍCULO
+      // ============================================
+      if (filters?.vehicleId || filters?.vehicleVariantId) {
+        const fitmentWhere: Prisma.PartFitmentWhereInput = {
+          isActive: true,
+        };
+
+        if (filters.vehicleVariantId) {
+          fitmentWhere.vehicleVariantId = filters.vehicleVariantId;
+        } else if (filters.vehicleId) {
+          fitmentWhere.vehicleId = filters.vehicleId;
+        }
+
+        // Si se incluyen universales, usar OR
+        if (filters.includeUniversal !== false) {
+          where.OR = [
+            { fitments: { some: fitmentWhere } },
+            { isUniversal: true },
+          ];
+        } else {
+          where.fitments = { some: fitmentWhere };
+        }
+      } else {
+        // Si no hay vehículo seleccionado, mostrar todos los productos
+        // (universales y los que tienen compatibilidades)
+        // No aplicar filtro de vehículo, mostrar todo
+      }
+
       return this.prisma.product.findMany({
         where,
         include: {
@@ -71,8 +106,30 @@ export class InventoryService {
               },
             },
           },
+          fitments: {
+            where: { isActive: true },
+            include: {
+              vehicle: {
+                select: {
+                  id: true,
+                  make: true,
+                  model: true,
+                  yearFrom: true,
+                  yearTo: true,
+                },
+              },
+              vehicleVariant: {
+                select: {
+                  id: true,
+                  trim: true,
+                  engine: true,
+                  transmission: true,
+                },
+              },
+            },
+          },
           _count: {
-            select: { inventoryItems: true, movements: true },
+            select: { inventoryItems: true, movements: true, fitments: true },
           },
         },
         orderBy: { createdAt: 'desc' },
@@ -111,6 +168,12 @@ export class InventoryService {
                 email: true,
               },
             },
+          },
+        },
+        fitments: {
+          include: {
+            vehicle: true,
+            vehicleVariant: true,
           },
         },
       },

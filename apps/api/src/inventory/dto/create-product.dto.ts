@@ -49,6 +49,22 @@ export class CreateProductDto {
   @SanitizeUrl()
   imageUrl?: string;
 
+  @IsOptional()
+  @IsString({ each: true })
+  images?: string[];
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  @SanitizeString()
+  partNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  @SanitizeString()
+  oemNumber?: string;
+
   @IsString()
   @IsOptional()
   @MaxLength(100)
@@ -59,5 +75,10 @@ export class CreateProductDto {
   @IsOptional()
   @Type(() => Boolean)
   isActive?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  @Type(() => Boolean)
+  isUniversal?: boolean;
 }
 

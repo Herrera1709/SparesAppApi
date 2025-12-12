@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsBoolean, MaxLength } from 'class-validator';
+import { IsOptional, IsString, IsBoolean, MaxLength, IsUUID } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { SanitizeString } from '../../common/security/input-sanitizer';
 
@@ -22,6 +22,14 @@ export class GetProductsQueryDto {
   brand?: string;
 
   @IsOptional()
+  @IsUUID()
+  vehicleId?: string; // ID del vehículo seleccionado
+
+  @IsOptional()
+  @IsUUID()
+  vehicleVariantId?: string; // ID de la variante del vehículo (opcional)
+
+  @IsOptional()
   @IsBoolean()
   @Transform(({ value }) => {
     if (value === 'true') return true;
@@ -29,5 +37,14 @@ export class GetProductsQueryDto {
     return undefined;
   })
   isActive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return undefined;
+  })
+  includeUniversal?: boolean; // Incluir repuestos universales
 }
 

@@ -66,18 +66,17 @@ export class OriginValidatorGuard implements CanActivate {
       return true;
     }
 
-    // En desarrollo, permitir acceso desde localhost sin validación estricta
-    const isDevelopment = process.env.NODE_ENV !== 'production';
-    if (isDevelopment) {
-      // Permitir localhost y 127.0.0.1 en desarrollo
-      if (origin && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+    // Permitir localhost y 127.0.0.1 (necesario para desarrollo local)
+    // Pero solo si están en la lista de orígenes permitidos
+    if (origin && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+      const isValidLocalhost = this.isOriginAllowed(origin);
+      if (isValidLocalhost) {
         return true;
       }
-      if (referer && (referer.includes('localhost') || referer.includes('127.0.0.1'))) {
-        return true;
-      }
-      // Si no hay origin ni referer en desarrollo, también permitir
-      if (!origin && !referer) {
+    }
+    if (referer && (referer.includes('localhost') || referer.includes('127.0.0.1'))) {
+      const isValidLocalhost = this.isRefererAllowed(referer);
+      if (isValidLocalhost) {
         return true;
       }
     }

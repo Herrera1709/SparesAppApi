@@ -373,19 +373,23 @@ model ChatSettings {
   @@map("chat_settings")
 }
 
-// Modelo de Producto
+// Modelo de Producto/Repuesto
 model Product {
   id          String   @id @default(uuid())
   sku         String   @unique // Código SKU único
-  name        String // Nombre del producto
+  partNumber  String? // Número de parte del fabricante
+  oemNumber   String? // Número OEM (Original Equipment Manufacturer)
+  name        String // Nombre del producto/repuesto
   description String? // Descripción del producto
-  category    String? // Categoría del producto
-  brand       String? // Marca
+  category    String? // Categoría del producto (frenos, suspensión, motor, etc.)
+  brand       String? // Marca del repuesto (Brembo, NGK, etc.)
   price       Decimal  @default(0) // Precio unitario en USD
   cost        Decimal  @default(0) // Costo unitario en USD
   imageUrl    String? // URL de la imagen
+  images      String[] @default([]) // Múltiples imágenes
   barcode     String? // Código de barras
   isActive    Boolean  @default(true) // Producto activo/inactivo
+  isUniversal Boolean  @default(false) // Repuesto universal (no requiere vehículo específico)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -393,7 +397,13 @@ model Product {
   inventoryItems Inventory[]
   movements      InventoryMovement[]
   orders         Order[]
+  fitments       PartFitment[] // Compatibilidad con vehículos
 
+  @@index([category])
+  @@index([brand])
+  @@index([sku])
+  @@index([partNumber])
+  @@index([oemNumber])
   @@map("products")
 }
 
@@ -450,4 +460,80 @@ enum InventoryMovementType {
   RETURN // Devolución
   DAMAGED // Producto dañado
   EXPIRED // Producto vencido
+}
+
+// ============================================
+// SISTEMA DE COMPATIBILIDAD DE REPUESTOS
+// ============================================
+
+// Modelo de Vehículo (Marca y Modelo)
+model Vehicle {
+  id          String   @id @default(uuid())
+  make        String // Marca (Toyota, Honda, Ford, etc.)
+  model       String // Modelo (Corolla, Civic, F-150, etc.)
+  yearFrom    Int? // Año inicial del modelo
+  yearTo      Int? // Año final del modelo
+  bodyType    String? // Tipo de carrocería (Sedan, SUV, Pickup, etc.)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relaciones
+  variants VehicleVariant[]
+  fitments PartFitment[]
+
+  @@unique([make, model, yearFrom, yearTo])
+  @@index([make])
+  @@index([model])
+  @@index([make, model])
+  @@map("vehicles")
+}
+
+// Modelo de Variante de Vehículo (Versión, Motor, Transmisión)
+model VehicleVariant {
+  id           String   @id @default(uuid())
+  vehicleId    String
+  trim         String? // Versión/Trim (LX, EX, SR, etc.)
+  engine       String? // Motor (1.8, 2.0, 2AR-FE, etc.)
+  transmission String? // Transmisión (Manual, Automática, CVT, etc.)
+  driveType    String? // Tracción (FWD, RWD, AWD, 4WD)
+  notes        String? // Notas adicionales
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relaciones
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  fitments PartFitment[]
+
+  @@index([vehicleId])
+  @@map("vehicle_variants")
+}
+
+// Modelo de Compatibilidad (Repuesto ↔ Vehículo)
+model PartFitment {
+  id              String   @id @default(uuid())
+  productId       String
+  vehicleId       String? // Vehículo base (si no requiere variante específica)
+  vehicleVariantId String? // Variante específica (si aplica)
+  yearFrom        Int? // Año inicial de compatibilidad
+  yearTo          Int? // Año final de compatibilidad
+  position        String? // Posición (delantero, trasero, izquierdo, derecho, etc.)
+  side            String? // Lado (izquierdo, derecho, ambos)
+  notes           String? // Notas adicionales de compatibilidad
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relaciones
+  product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  vehicle        Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicleVariant VehicleVariant? @relation(fields: [vehicleVariantId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([vehicleId])
+  @@index([vehicleVariantId])
+  @@index([productId, vehicleId])
+  @@index([productId, vehicleVariantId])
+  @@map("part_fitments")
 }

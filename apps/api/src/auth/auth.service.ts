@@ -134,9 +134,12 @@ export class AuthService {
     // SEGURIDAD: No revelar si el usuario existe o no
     // ============================================
     if (!user) {
+      this.logger.warn(`[AuthService] Login fallido: Usuario no encontrado para email: ${email.substring(0, 3)}***`);
       await this.bruteForceGuard.recordFailedAttempt(identifier);
       throw new UnauthorizedException('Credenciales inválidas');
     }
+
+    this.logger.debug(`[AuthService] Usuario encontrado: ${user.email}, emailVerified: ${user.emailVerified}`);
 
     // ============================================
     // SEGURIDAD: Verificar contraseña con protección contra timing attacks
@@ -146,6 +149,7 @@ export class AuthService {
       isPasswordValid = await bcrypt.compare(password, user.password);
     } catch (error) {
       // Si hay error en bcrypt, registrar y lanzar error genérico
+      this.logger.error(`[AuthService] Error en bcrypt.compare:`, error);
       this.securityLogger.logSecurityEvent(
         SecurityEventType.SUSPICIOUS_ACTIVITY,
         { ip: identifier, path: '/auth/login', error: 'bcrypt error', email: email.substring(0, 3) + '***' }
@@ -155,6 +159,7 @@ export class AuthService {
     }
 
     if (!isPasswordValid) {
+      this.logger.warn(`[AuthService] Login fallido: Contraseña incorrecta para usuario: ${user.email}`);
       await this.bruteForceGuard.recordFailedAttempt(identifier);
       this.securityLogger.logSecurityEvent(
         SecurityEventType.MULTIPLE_FAILED_LOGINS,
@@ -166,9 +171,12 @@ export class AuthService {
     // Verificar que el email esté confirmado
     // Si emailVerified es null o undefined (usuarios antiguos), tratarlo como no verificado
     if (!user.emailVerified || user.emailVerified === null || user.emailVerified === undefined) {
+      this.logger.warn(`[AuthService] Login fallido: Email no verificado para usuario: ${user.email}`);
       await this.bruteForceGuard.recordFailedAttempt(identifier);
       throw new UnauthorizedException('Por favor, verifica tu correo electrónico antes de iniciar sesión. Revisa tu bandeja de entrada.');
     }
+
+    this.logger.debug(`[AuthService] ✅ Validaciones pasadas, generando token para usuario: ${user.email}`);
 
     // ============================================
     // SEGURIDAD: Login exitoso - limpiar intentos

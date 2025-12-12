@@ -61,18 +61,12 @@ export class ApiKeyGuard implements CanActivate {
       }
       return true;
     }
+
     const apiKey = request.headers[this.apiKeyHeader.toLowerCase()] as string;
     const appId = request.headers[this.appIdHeader.toLowerCase()] as string;
 
     // Obtener IP del cliente
     const ip = this.getClientIp(request);
-
-    // En desarrollo, permitir acceso sin API key si no está configurada
-    const isDevelopment = process.env.NODE_ENV !== 'production';
-    if (isDevelopment && this.validApiKeys.length === 0) {
-      // Si no hay API keys configuradas en desarrollo, permitir acceso
-      return true;
-    }
 
     // Si no hay API key, rechazar
     if (!apiKey) {

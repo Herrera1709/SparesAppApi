@@ -16,6 +16,8 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { ChatModule } from './chat/chat.module';
 import { ProductExtractorModule } from './product-extractor/product-extractor.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { VehiclesModule } from './vehicles/vehicles.module';
+import { FitmentModule } from './fitment/fitment.module';
 import { SecurityModule } from './common/security/security.module';
 import { GlobalExceptionFilter } from './common/security/error-handler.filter';
 import { HealthModule } from './health/health.module';
@@ -39,6 +41,8 @@ import { HealthModule } from './health/health.module';
     ChatModule,
     ProductExtractorModule,
     InventoryModule,
+    VehiclesModule,
+    FitmentModule,
     HealthModule,
   ],
   providers: [
