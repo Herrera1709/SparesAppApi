@@ -39,6 +39,8 @@ export class InventoryService {
     vehicleVariantId?: string;
     isActive?: boolean;
     includeUniversal?: boolean;
+    page?: number;
+    limit?: number;
   }) {
     try {
       const where: Prisma.ProductWhereInput = {};
@@ -96,7 +98,16 @@ export class InventoryService {
         // No aplicar filtro de vehículo, mostrar todo
       }
 
-      return this.prisma.product.findMany({
+      // Paginación
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 20;
+      const skip = (page - 1) * limit;
+
+      // Obtener total de productos
+      const total = await this.prisma.product.count({ where });
+
+      // Obtener productos paginados
+      const products = await this.prisma.product.findMany({
         where,
         include: {
           inventoryItems: {
@@ -133,12 +144,36 @@ export class InventoryService {
           },
         },
         orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
       });
+
+      return {
+        data: products,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+          hasNextPage: page < Math.ceil(total / limit),
+          hasPrevPage: page > 1,
+        },
+      };
     } catch (error: any) {
       // Si la tabla no existe, retornar array vacío en lugar de lanzar error
       if (error.code === 'P2021' || error.code === '42P01' || error.message?.includes('does not exist')) {
         this.logger.warn('Las tablas de inventario no existen. Ejecuta la migración: npx prisma migrate dev');
-        return [];
+        return {
+          data: [],
+          pagination: {
+            page: 1,
+            limit: 20,
+            total: 0,
+            totalPages: 0,
+            hasNextPage: false,
+            hasPrevPage: false,
+          },
+        };
       }
       throw error;
     }

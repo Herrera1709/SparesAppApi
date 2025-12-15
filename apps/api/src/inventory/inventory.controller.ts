@@ -59,6 +59,8 @@ export class InventoryController {
       vehicleVariantId: queryDto.vehicleVariantId,
       isActive: queryDto.isActive,
       includeUniversal: queryDto.includeUniversal,
+      page: queryDto.page,
+      limit: queryDto.limit,
     });
   }
 
