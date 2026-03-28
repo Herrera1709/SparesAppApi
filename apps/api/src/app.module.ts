@@ -21,6 +21,8 @@ import { FitmentModule } from './fitment/fitment.module';
 import { SecurityModule } from './common/security/security.module';
 import { GlobalExceptionFilter } from './common/security/error-handler.filter';
 import { HealthModule } from './health/health.module';
+import { ExternalProductsModule } from './external-products/external-products.module';
+import { ImportedProductsModule } from './imported-products/imported-products.module';
 
 @Module({
   imports: [
@@ -44,6 +46,8 @@ import { HealthModule } from './health/health.module';
     VehiclesModule,
     FitmentModule,
     HealthModule,
+    ExternalProductsModule,
+    ImportedProductsModule,
   ],
   providers: [
     {

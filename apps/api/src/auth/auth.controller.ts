@@ -1,7 +1,8 @@
-import { Controller, Post, Body, Req } from '@nestjs/common';
+import { Controller, Post, Body, Req, Get, Query, ForbiddenException } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { AuthService } from './auth.service';
+import { EmailService } from '../email/email.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -12,7 +13,10 @@ import { PublicApi } from '../common/security/public-api.decorator';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly emailService: EmailService,
+  ) {}
 
   private getClientInfo(req: Request) {
     const ip = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'Desconocida';
@@ -70,6 +74,19 @@ export class AuthController {
   @Post('resend-verification')
   async resendVerification(@Body() resendVerificationDto: ResendVerificationDto) {
     return this.authService.resendVerificationEmail(resendVerificationDto.email);
+  }
+
+  /** Solo en desarrollo: envía un correo de prueba para comprobar Resend. GET /api/auth/test-email?to=tu@email.com */
+  @PublicApi()
+  @Get('test-email')
+  async testEmail(@Query('to') to: string) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException('No disponible en producción');
+    }
+    if (!to || !to.includes('@')) {
+      return { success: false, error: 'Query param "to" con un email válido es requerido. Ej: ?to=tu@email.com' };
+    }
+    return this.emailService.sendTestEmail(to.trim());
   }
 }
 

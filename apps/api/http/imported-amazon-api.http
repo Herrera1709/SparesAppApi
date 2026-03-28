@@ -1,0 +1,40 @@
+### Variables (ajusta host y token si aplica)
+@baseUrl = http://localhost:3000/api
+
+### 1) Importar por URL Amazon (ruta plana)
+# Respuesta 200 (ejemplo): { "id":"uuid", "source":"AMAZON", "sourceId":"B08N5WRWNW", "title":"...",
+#   "mainImageUrl":"https://...", "basePriceUsd":29.99, "localPath":"/product/amazon/B08N5WRWNW",
+#   "apiPath":"/api/product/amazon/B08N5WRWNW", "pricing":{ "finalPriceLocal":12345.67, ... },
+#   "warnings":[], "alreadyImported":false }
+POST {{baseUrl}}/import-product
+Content-Type: application/json
+
+{
+  "url": "https://www.amazon.com/dp/B08N5WRWNW",
+  "forceRefresh": false
+}
+
+### 1b) Mismo endpoint usando `input` (texto pegado en buscador)
+POST {{baseUrl}}/import-product
+Content-Type: application/json
+
+{
+  "input": "https://www.amazon.com/dp/B08N5WRWNW"
+}
+
+### 2) Ficha JSON (misma ruta que usa el SPA /product/amazon/:asin)
+GET {{baseUrl}}/product/amazon/B08N5WRWNW
+
+### 3) Búsqueda híbrida: URL → importa; texto → catálogo local
+POST {{baseUrl}}/imported-products/hybrid-search
+Content-Type: application/json
+
+{
+  "q": "auriculares"
+}
+
+### 4) Refrescar precio desde PA-API (id = UUID del producto importado)
+POST {{baseUrl}}/imported-products/UUID_AQUI/revalidate
+Content-Type: application/json
+
+{}

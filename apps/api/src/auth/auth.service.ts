@@ -1,4 +1,5 @@
 import { Injectable, UnauthorizedException, BadRequestException, NotFoundException, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
@@ -15,14 +16,23 @@ import { SecurityLoggerService, SecurityEventType } from '../common/security/sec
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
+  /** En desarrollo: si REQUIRE_EMAIL_VERIFICATION=false, se permite login sin verificar email */
+  private readonly requireEmailVerification: boolean;
 
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private configService: ConfigService,
     private emailService: EmailService,
     private bruteForceGuard: BruteForceGuard,
     private securityLogger: SecurityLoggerService,
-  ) {}
+  ) {
+    const envValue = this.configService.get<string>('REQUIRE_EMAIL_VERIFICATION');
+    this.requireEmailVerification = envValue !== 'false';
+    if (!this.requireEmailVerification && process.env.NODE_ENV === 'production') {
+      this.logger.warn('[Auth] REQUIRE_EMAIL_VERIFICATION=false ignorado en producción. Se exige verificación de email.');
+    }
+  }
 
   async register(registerDto: RegisterDto, clientInfo?: { ip?: string; userAgent?: string; timestamp?: Date }) {
     const { email, password, ...rest } = registerDto;
@@ -168,9 +178,9 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    // Verificar que el email esté confirmado
-    // Si emailVerified es null o undefined (usuarios antiguos), tratarlo como no verificado
-    if (!user.emailVerified || user.emailVerified === null || user.emailVerified === undefined) {
+    // Verificar que el email esté confirmado (salvo en desarrollo con REQUIRE_EMAIL_VERIFICATION=false)
+    const skipVerification = !this.requireEmailVerification && process.env.NODE_ENV !== 'production';
+    if (!skipVerification && (!user.emailVerified || user.emailVerified === null || user.emailVerified === undefined)) {
       this.logger.warn(`[AuthService] Login fallido: Email no verificado para usuario: ${user.email}`);
       await this.bruteForceGuard.recordFailedAttempt(identifier);
       throw new UnauthorizedException('Por favor, verifica tu correo electrónico antes de iniciar sesión. Revisa tu bandeja de entrada.');

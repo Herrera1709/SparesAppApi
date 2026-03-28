@@ -15,13 +15,14 @@ export class EmailService {
 
   constructor(private configService: ConfigService) {
     const apiKey = this.configService.get<string>('RESEND_API_KEY');
-    this.fromEmail = this.configService.get<string>('RESEND_FROM') || 'tickets@tiketpass.net';
+    // Plan gratuito Resend: solo permite enviar desde onboarding@resend.dev (o dominio verificado)
+    this.fromEmail = this.configService.get<string>('RESEND_FROM') || 'ImportaCR <onboarding@resend.dev>';
     this.rpsLimit = Math.max(1, parseInt(this.configService.get<string>('RESEND_RPS_LIMIT') || '2', 10));
     this.maxRetries = Math.max(1, parseInt(this.configService.get<string>('RESEND_MAX_RETRIES') || '5', 10));
     this.idempotencyEnabled = this.configService.get<string>('RESEND_DISABLE_IDEMPOTENCY') !== '1';
     
     if (!apiKey) {
-      this.logger.error('RESEND_API_KEY no está configurado. Los emails no se enviarán.');
+      this.logger.error('RESEND_API_KEY no está configurado en .env. Los correos NO se enviarán. Añade RESEND_API_KEY desde https://resend.com');
       return;
     }
 
@@ -114,13 +115,42 @@ export class EmailService {
         }
 
         // Error no transitorio
-        this.logger.error(`[Resend] Error no recuperable — status=${status} msg=${err?.message || err}`);
+        this.logger.error(`[Resend] Error no recuperable — status=${status} msg=${err?.message || err}`, err?.stack || '');
         throw err;
       }
     }
 
     this.logger.error(`[Resend] Agotados reintentos — ${lastErr?.message || lastErr}`);
     throw lastErr || new Error('Fallo al enviar email (reintentos agotados)');
+  }
+
+  /**
+   * Envía un correo de prueba. Útil para comprobar RESEND_API_KEY y RESEND_FROM.
+   * Devuelve el resultado de Resend o el error para depuración.
+   */
+  async sendTestEmail(to: string): Promise<{ success: boolean; id?: string; error?: string }> {
+    if (!this.resend) {
+      return { success: false, error: 'Resend no configurado. Añade RESEND_API_KEY en .env' };
+    }
+    const mailOpts = {
+      from: this.fromEmail,
+      to,
+      subject: 'Prueba ImportaCR',
+      html: '<p>Si ves este correo, el envío con Resend está funcionando.</p>',
+    };
+    try {
+      const response = await this.sendWithRetry(mailOpts) as any;
+      if (response?.error) {
+        const msg = response.error?.message || JSON.stringify(response.error);
+        return { success: false, error: msg };
+      }
+      const id = response?.data?.id || response?.id;
+      return { success: true, id: id || 'ok' };
+    } catch (err: any) {
+      const msg = err?.message || err?.response?.data?.message || String(err);
+      this.logger.error(`[Resend] Test email failed: ${msg}`);
+      return { success: false, error: msg };
+    }
   }
 
   async sendPasswordResetEmail(email: string, resetToken: string, firstName?: string): Promise<void> {
